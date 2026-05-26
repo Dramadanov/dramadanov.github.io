@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writings | Portfolio</title>
+    
+    <!-- Google Fonts: Inter for UI, Playfair Display for readable text -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s ease-out forwards',
+                        'blob': 'blob 7s infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Custom Scrollbar for the reading window */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="bg-[#0a0a0a] text-gray-200 font-sans min-h-screen overflow-hidden selection:bg-indigo-500/30">
+
+    <!-- Background Animated Blobs for visual impact -->
+    <div class="fixed inset-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-0 -left-4 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob"></div>
+        <div class="absolute top-0 -right-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob animation-delay-4000"></div>
+    </div>
+
+    <main class="relative h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-3xl mx-auto z-10 animate-slide-up">
+            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-6">
+                The <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">Written</span> Word
+            </h1>
+            <p class="text-lg md:text-xl text-gray-400 font-light mb-12 max-w-2xl mx-auto leading-relaxed">
+                An interactive archive of my thoughts, narratives, and poetic explorations. Select a medium below to begin reading.
+            </p>
+            
+            <div class="flex flex-wrap justify-center gap-4 md:gap-6">
+                <!-- Buttons trigger the JS openModal function -->
+                <button onclick="openModal('shortstories')" class="group relative px-6 py-3 font-medium text-white transition-all duration-300 ease-in-out bg-white/5 border border-white/10 rounded-full hover:bg-white/10 hover:scale-105 hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                    <span class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        Short Stories
+                    </span>
+                </button>
+
+                <button onclick="openModal('scripts')" class="group relative px-6 py-3 font-medium text-white transition-all duration-300 ease-in-out bg-white/5 border border-white/10 rounded-full hover:bg-white/10 hover:scale-105 hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                    <span class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
+                        Scripts
+                    </span>
+                </button>
+
+                <button onclick="openModal('poems')" class="group relative px-6 py-3 font-medium text-white transition-all duration-300 ease-in-out bg-white/5 border border-white/10 rounded-full hover:bg-white/10 hover:scale-105 hover:shadow-[0_0_20px_rgba(236,72,153,0.3)] focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                    <span class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                        Poems
+                    </span>
+                </button>
+
+                <button onclick="openModal('muses')" class="group relative px-6 py-3 font-medium text-white transition-all duration-300 ease-in-out bg-white/5 border border-white/10 rounded-full hover:bg-white/10 hover:scale-105 hover:shadow-[0_0_20px_rgba(56,189,248,0.3)] focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-gray-900">
+                    <span class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                        Muses
+                    </span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Reading Modal Overlay (Hidden by default) -->
+    <div id="readerModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 opacity-0 pointer-events-none transition-all duration-500 ease-in-out">
+        
+        <!-- Backdrop blur layer to close modal when clicked -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal()"></div>
+        
+        <!-- Modal Content -->
+        <div id="readerContent" class="glass-panel w-full max-w-4xl h-[85vh] rounded-3xl shadow-2xl relative flex flex-col transform translate-y-10 scale-95 transition-all duration-500 ease-out z-10">
+            
+            <!-- Pagination Nav Tab -->
+            <div id="paginationNav" class="hidden absolute top-16 md:top-24 right-full w-12 md:w-14 py-4 rounded-l-xl bg-gray-800/95 backdrop-blur-xl border border-white/10 border-r-0 shadow-[-8px_0_20px_rgba(0,0,0,0.4)] flex flex-col items-center justify-center gap-2 z-[-1]">
+                <!-- Buttons injected via JS -->
+            </div>
+            
+            <!-- Modal Header (Sticky) -->
+            <div class="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-gray-900/50 rounded-t-3xl backdrop-blur-md sticky top-0 z-20">
+                <div>
+                    <span id="modalTag" class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-1 block">Category</span>
+                    <h2 id="modalTitle" class="text-2xl font-bold text-white tracking-tight transition-opacity duration-300 ease-in-out">Writing Title</h2>
+                </div>
+                
+                <!-- Close Button -->
+                <button onclick="closeModal()" class="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Scrollable Reading Area -->
+            <div class="overflow-y-auto p-6 md:p-10 hide-scrollbar flex-1 relative">
+                <!-- Dynamic Content goes here -->
+                <article id="modalBody" class="prose prose-invert prose-lg max-w-none font-serif leading-relaxed text-gray-300 transition-opacity duration-300 ease-in-out">
+                    <!-- Content injected via JS -->
+                </article>
+                
+                <!-- Bottom fade effect for aesthetics -->
+                <div class="sticky bottom-0 left-0 w-full h-12 bg-gradient-to-t from-[#111827] to-transparent pointer-events-none"></div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        const contentData = {
+            'shortstories': {
+                tag: 'Short Stories',
+                tagColor: 'text-indigo-400',
+                items: [
+                    {
+                        title: "Life",
+                        body: `
+                            <p class="first-letter:text-5xl first-letter:font-bold first-letter:text-white first-letter:mr-3 first-letter:float-left">Somewhere, there was a shore. Every morning on that shore, you could see footprints going from east to west. Every night, the steps were erased gently by the waves.</p>
+                            <p>It was indeed that, what a local fisherman was noticing every day as he was returning from his nightly fishing spot. One day, the fisherman had to return earlier, shivering because of a fiery storm. The sun was still rising, heading towards its inevitable gloom, behind the dark curtain. He noticed a woman in a white dress, walking barefoot on the beach, coming towards him.</p>
+                            <p>“Good morning,” said the woman with a smile. “The waves have not been kind today, I suppose.”</p>
+                            <p>“The waves are often not,” responded the fisherman, smiling back and taking his hat off. “The sea protects its young.”</p>
+                            <p>“And forsakes the bold,” replied the woman while closing her eyes and taking a deep breath.</p>
+                            <p>“I’ve noticed you walk around the shore every morning,” the fisherman said while looking at the dark clouds in the distance where he came from. “I used to walk around myself when I was a youngin, listening to waves. You could say they were calling for me.” The fisherman scratched his beard and started to tie his boat to the nearest pole.</p>
+                            <p>“The man I love is a sailor. He adores the sea. He hasn’t returned for nearly 5 years. I promised him I would wait for him and tomorrow, that promise ends,” the woman said surprisingly to the fisherman. She was holding a sailor’s jacket tightly to her chest. The fisherman looked at her bashfully and started to tinker with something on his boat while nodding and smiling. The woman continued. “Every day I go around the shore, thinking of him. Wishing for his safe return. I sit on the Silent Rocks, while my feet are being embraced by the waves. Their gentle caress reminds me of him,” she said, now her voice trembling, but still smiling. “Life, he always said, is measured by the love you give to the world,” said she, leaving the jacket resting on the side of the boat, and started to walk off in the distance.</p>
+                            <p>It took him a while for the fisherman to notice the woman had left, turning left and right, looking for her, but nowhere to be seen, just the footsteps pointing in the right direction, disappearing slowly. He noticed the jacket, took it with a gentle smile, and said, “Life is hard to measure because each of us leaves footprints in the sand.”</p>
+                            <p>On his next return from the sea, the man couldn’t see any indication that anyone had walked on the beach. He never saw the woman again.</p>
+                            <p>Somewhere, there was a shore. Every morning on that shore, you couldn’t see footprints going from east to west. Every night, the waves wept.</p>
+                        `
+                    },
+                    {
+                        title: "Death",
+                        body: `
+                            <p class="first-letter:text-5xl first-letter:font-bold first-letter:text-white first-letter:mr-3 first-letter:float-left">The man was sitting quietly in his chair, surrounded by darkness. The single bright light was shining above him, making him the center of attention. He looked down at his feet, naked and charred, they were missing his shoes. His ragged clothes had so many holes, he didn’t bother to count them.</p>
+                            <p>“Do you fear death, old man?” a deep voice spoke with an echo.</p>
+                            <p>The man did not react and kept looking at his feet. Silence ensued for some time.</p>
+                            <p>The man sighed and started, “There was a man once. A shepherd. He was from a village to the east, situated near a river. Every day he would herd his sheep upward the river and reach his favorite place — a waterfall. He would sit there, on the grass for some time and watch the water crashing down, feeding into the river. He would make his way home and milk his sheep, giving it to those who needed it, and forgiving debts to those who couldn’t afford it. He was making more than enough for himself, it would’ve been selfish not to share the extra he didn’t require. This went on for many years. One day, as he was approaching his favorite spot, he heard a splash in the water. Worried, the man rushed towards the waterfall, his eyes racing left and right, he noticed a figure swimming in the river. As he was coming closer and closer, the image of a woman appeared, taking a bath in the crystal water. He froze in place and the woman’s astonishing sparkling beauty overtook his thoughts, while every sound was muffled. As she was turning, the woman noticed him, putting her right arm in front of her bosom and making an aggressive gesture with her left towards the man to turn away. The man shamefully turned his back and remained in his place. The noises began to become audible and he turned towards the waterfall only to find that the girl was gone.</p>
+                            <p>With shame for his actions, every time he would see the girl near the waterfall, he would try to talk to her from afar, trying not to scare her. He wanted desperately to profusely apologise for the first day, but there would be no answer to his calls. Unable to sleep much after that day because his thoughts were completely consumed with the lady swimmer.</p>
+                            <p>Months passed, until one day after returning home, he noticed a sheep from his herd was missing. He searched far and wide, moving through his route and the unknown paths he had never taken before, but alas, the sheep was not found.</p>
+                            <p>The next day, at his favorite spot, the lady from the river was waiting for him, caressing his missing sheep. The man smiled and thanked her, while she just made gestures with her hands. It didn’t take him long to realise that the woman was deaf. Even though with a giant barrier between them, the man took a keen interest in her and started to learn her language of signs, desperately looking forward to communicate every time they met on that fateful spot.</p>
+                            <p>Not long after, they became to understand each other, to care for one another, ultimately this care transformed into love. They started living together and eventually welcomed two healthy baby boys.</p>
+                            <p>The man started to realise that the milk he was giving away before was needed now, as he had more mouths to feed and he started to refuse to give any for free, anymore. He tried to explain it to people of the village, but they would disregard his reasoning and start yelling every time, saying that he was selfish, while spitting and cursing at him. He thought people would understand eventually and once his family didn’t need as much, he would start giving again.</p>
+                            <p>Winter came one year and on a particularly cold day, the man was returning from his route when he noticed a fire coming from his house. He sprinted so fast, one of his sandals ripped off and he lost his balance, hitting the ground. Angrily, he got up, picked his second sandal and threw it away, while swiftly pressing forward and reaching his blazing home. His first thought was his loving wife and children, who were nowhere to be seen amidst the reddishly dark and crackling wood of his flaming house. The man stormed the house, stepping on the fiery floor, burning his flesh, yet he did not feel a thing. Flames engulfed his surroundings and smoke clouded his vision, his search proved useless and he couldn’t find his wife and children. He began to splash water on the giant inferno, alas it was vain. Soon everything crumbled, the smoke reached the heavens and the flames fizzled out one by one.</p>
+                            <p>The man was watching the charred remains of his loved ones and the only thoughts he had were full of pain. The next day he buried them next to the waterfall, where he and she were most happy, wishing they didn’t suffer. On his return, he noticed his barrack was not set ablaze. On entering it, he saw two people rummaging through his stock, but he did not react. The people got startled and panicked, running through a small hole they've made to get through. As soon as the people ran away, he destroyed everything that was left. He went outside and killed each one of his sheep with one swift move from his knife without flinching.</p>
+                            <p>The man started to walk towards a hill. Hours passed and he reached a cliff. Without looking down, he walked forward and as he was falling he realised that his feet hurt.”</p>
+                        `
+                    }
+                ]
+            },
+            'scripts': {
+                tag: 'Scripts & Screenplays',
+                tagColor: 'text-purple-400',
+                items: [
+                    {
+                        title: "Max Payne 4: The End is Payne",
+                        body: `
+                            <div class="font-mono text-base md:text-lg text-gray-300">
+                                <p class="text-center font-bold text-white">EXT. NIGHT BETWEEN CITY BUILDINGS</p>
+                                <br/>
+                                <p>Shot from above two male silhouettes in a rainy night, hovering while slowly descends.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">MAX PAYNE (V.O.)</span>This was it. My hellish existence crammed between steel giants, looking at my only exit. Waiting for the final click, signaling my dramatic downfall.</p>
+                                <br/>
+                                <p>Camera descends, getting close to a pistol pointed to Max's face.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">MAX PAYNE (V.O.)</span>A flashback of once's choices within a second, summarized in a single bullet.</p>
+                                <br/>
+                                <p class="uppercase">CAMERA ROTATES, FACING THE GUN'S BARREL. A FLASH, SIGNALING IT HAS BEN JUST SHOT. FREEZE FRAME.</p>
+                                <br/>
+                                <p class="text-right font-bold text-white mr-4">CUT TO:</p>
+                                <br/>
+                                <p class="text-center font-bold text-white">INT. 48 HOURS EARLIER. MAX'S BEDROOM</p>
+                                <br/>
+                                <p class="uppercase">OVERHEAD SHOT, FAN CIRCLING ABOVE</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">MAX PAYNE (V.O.)</span>I woke up with the usual hangover. Alcohol still clawing at my slow-beating heart like it's desperate to get in.</p>
+                                <br/>
+                                <p>Max stands up from his bed, looking down at the floor, before getting up slowly and going to the bathroom.</p>
+                                <br/>
+                                <p class="uppercase">SHOT OF THE MIRROR, MAX LOOKING AT IT</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">MAX PAYNE (V.O.)</span>I look at my own reflection as if I'm trying to escape it. Having thoughts and doubts about moments forgotten in time.</p>
+                                <br/>
+                                <p>Max splashes his face.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">MAX PAYNE (V.O.)</span>I try to wash my sins with blood, while running from my own judge and jury. Chasing me with its rotten gavel of yesterday.</p>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "The Faithful Knock",
+                        body: `
+                            <div class="font-mono text-base md:text-lg text-gray-300">
+                                <p class="text-center font-bold text-white">INT. APARTMENT FLOOR - NIGHT</p>
+                                <br/>
+                                <p>We open with a close shot outside of an apartment front door. A clenched fist reaches and knocks.</p>
+                                <br/>
+                                <p class="text-right font-bold text-white mr-4">CUT TO:</p>
+                                <br/>
+                                <p class="text-center font-bold text-white">INT. INSIDE OF THE APARTMENT - LIVING ROOM - NIGHT</p>
+                                <br/>
+                                <p>We see the back of a male figure, who is cleaning a messy living room, suggesting a struggle.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D. (V.O.)</span>You can tell a lot about a person from the things they keep around.</p>
+                                <br/>
+                                <p>We see broken items, in order from left to right - a clock on the floor broken; a torn down poster; books scattered around; screen cut vertically, in contrast to what the character mentions.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>A clock on the wall, poster of your favorite film, a collection of books about self-help.</p>
+                                <br/>
+                                <p>The character picks up other objects, trying to fix the mess. Some things appear beyond repair and he throws them in the trash.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>At home we create order, only for ourselves. The one place where we don't have to desperately try to fit in.</p>
+                                <br/>
+                                <p>We see pieces of glass on the floor. J.D. hand scoops them up with a broom.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>And there comes a time when chaos appears. Creating its own set of rules, that you will never learn to follow.</p>
+                                <br/>
+                                <p>TIGHT on a piece of glass edged into a wall. J.D. hand enters the screen, pulls it out and light reflects off of it.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>No matter how much you clean after it, there always will be a tiny piece left, edged in somewhere, waiting to be found. To remind you that chaos is still around, laughing silently.</p>
+                                <br/>
+                                <p>TIGHT on blood on a wooden TV stand. J.D. starts cleaning it with a rag.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>It is in our nature to want to clean up the messes we've created. So, there's nothing left to remind us of that particular moment.</p>
+                                <br/>
+                                <p>We see J.D. cleaning multiple items in order, vertically introduced from the center of the screen - TV; floor; wall; table;</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>Yet, it happens again, and again, and again, and again.</p>
+                                <br/>
+                                <p>Black screen. Ultraviolet light opens into an overshot of J.D. moving the light around, searching for blood residue.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>We want to forget all about it. Go to the moment where it never happened.</p>
+                                <br/>
+                                <p>TIGHT shot of a picture of the same living room, camera pans up to the living room, matching each detail of furniture and items.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>We drag ourselves into the same circle of patterns we've created for ourselves. Afraid of change, and because we think we're so good at controlling them.</p>
+                                <br/>
+                                <p class="text-right font-bold text-white mr-4">CUT TO:</p>
+                                <br/>
+                                <p class="text-center font-bold text-white">EXT. OUTSIDE OF THE APARTMENT BUILDING - NIGHT</p>
+                                <br/>
+                                <p>We can see the back of a car, red lights fill the screen, while J.D. Is dragging a body.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>We think we're better than the rest. While we fill our pockets full of sins, on the road towards our selfish desires.</p>
+                                <br/>
+                                <p>We see inside of the trunk, unfocused, the body is thrown into it, J.D. Pauses for a second and closes the boot.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>We focus on our miserable lives, reminding ourselves from time to time, of the never-ending mirage called dream.</p>
+                                <br/>
+                                <p class="text-right font-bold text-white mr-4">CUT TO:</p>
+                                <br/>
+                                <p class="text-center font-bold text-white">EXT. FOREST - NIGHT</p>
+                                <br/>
+                                <p>Black screen. We hear J.D. muffled narration and the sound of a shovel digging.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>There comes a time when a knock on the door of one's own consciousness can be heard. We quickly ignore it.</p>
+                                <br/>
+                                <p>We see inside of the hole, the body is thrown into, covering the screen</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>Until one day, the inevitable happens - an accident, a heart attack, nasty disease, cancer.</p>
+                                <br/>
+                                <p>We see an overshot of J.D. Throwing dirt on the body with the shovel.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>And suddenly time's up. We quickly summarise our lives and start feeling as if we're in a hole - being buried - alive.</p>
+                                <br/>
+                                <p>We see the hole is filled, camera starts panning in towards J.D. While he lights up a cigarette, grabs something from his pocket, which eventually comes into focus - the back of a polaroid picture.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>Then we remember that knock we heard. Of our consciousness, filled with regret it starts to wrap around us and begins to rot us from the inside.</p>
+                                <br/>
+                                <p>We see J.D. Lights up the polaroid, throws on the ground and drives off. Camera remains on the burning polaroid.</p>
+                                <br/>
+                                <p class="text-center w-5/6 md:w-2/3 mx-auto"><span class="font-bold text-white block mb-1">J.D.</span>Unless you're this guy, who forces his 11 years old at night. Then, I'm behind the knock. And there's no time for your consciousness.</p>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            'poems': {
+                tag: 'Poems',
+                tagColor: 'text-pink-400',
+                items: [
+                    {
+                        title: "Leaf",
+                        body: `
+                            <div class="text-center italic text-xl leading-loose py-8">
+                                <p>A tiny leaf comes to life on an old tree<br/>
+                                It takes a glimpse of the world around<br/>
+                                Surrounded by its brothers and sisters<br/>
+                                Happy to grow while it is loved<br/>
+                                Day and night the breeze plays with it<br/>
+                                Says good morning to the sun<br/>
+                                Whispers goodnight to the moon<br/>
+                                It grows with its family fulfilled</p>
+                                <br/>
+                                <p>The moment comes to say goodbye<br/>
+                                Watching each day one by one<br/>
+                                Its siblings falling down<br/>
+                                Waves to each one with a loving gaze<br/>
+                                Only waiting for its turn to come</p>
+                                <br/>
+                                <p>When released with a smile it takes a dive<br/>
+                                Dancing happily towards the ground<br/>
+                                Its fallen brethren and sistren it wants to join<br/>
+                                And be a family once again</p>
+                            </div>
+                        `
+                    },
+                    {
+                        title: "Pebble",
+                        body: `
+                            <div class="text-center italic text-xl leading-loose py-8">
+                                <p>A round pebble greeted me once<br/>
+                                All alone on an empty road<br/>
+                                It did not speak, yet it told me<br/>
+                                How lost it felt in this world<br/>
+                                It had no words to say, nor songs to sing<br/>
+                                Yet I listened to its tale even if I didn't understand<br/>
+                                I felt connection nonetheless<br/>
+                                Because it shared its pain with me</p>
+                                <br/>
+                                <p>I picked it up and held it tightly<br/>
+                                To show love and compassion<br/>
+                                I did not say but I think it understood<br/>
+                                That I was a pebble once too</p>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            'muses': {
+                tag: 'Muses & Thoughts',
+                tagColor: 'text-sky-400',
+                items: [
+                    {
+                        title: "The Stretch of Time",
+                        body: `
+                            <p class="first-letter:text-5xl first-letter:font-bold first-letter:text-white first-letter:mr-3 first-letter:float-left">Time is a constant. But to us, time is finite. Once we realise these facts, we're in a place of fear and dreadful thoughts. For us the less we think of our limited measurement of life on this tiny speck of space dust, the less critical we are of how we spend it.</p>
+                            <p>We reflect on our memories through our own perspective, our own experiences. I'm sitting here thinking that, if we somehow start sharing time with one-another, time slowly begins to stretch and show us how unlimited it can be.</p>
+                            <p>The life we live is the time we spend and what's important is the footsteps we leave around for others to witness. The memories of us, that they will tell about us, of the moments we've shared, our measurement spent together. And then, we would become one with time itself.</p>
+                        `
+                    },
+                    {
+                        title: "The Weight of Consciousness",
+                        body: `
+                            <p class="first-letter:text-5xl first-letter:font-bold first-letter:text-white first-letter:mr-3 first-letter:float-left">The bell of consciousness rings constant. It brings the toll of one's humanity to the fold of their existence. Magical what-ifs, glued to the replay button of your life's VHS tape. We keep rewinding until we wear out our own self. Walking backwards to a worse fate. To a place of questions and empty answers. Slowly burying us to the center of the earth. Yet we keep hearing the bell ringing along the way. Before we can realise, we're the ones tolling it. Pulling its rope, to wake our consciousness.</p>
+                        `
+                    }
+                ]
+            }
+        };
+
+        const modal = document.getElementById('readerModal');
+        const modalContent = document.getElementById('readerContent');
+        const modalTag = document.getElementById('modalTag');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const paginationNav = document.getElementById('paginationNav');
+
+        let currentCategory = '';
+        let currentItemIndex = 0;
+        const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+
+        function renderPagination(data) {
+            if (data.items.length > 1) {
+                paginationNav.classList.remove('hidden');
+                paginationNav.innerHTML = ''; // Clear existing buttons
+                
+                data.items.forEach((_, index) => {
+                    const btn = document.createElement('button');
+                    btn.innerText = romanNumerals[index] || (index + 1);
+                    const isActive = index === currentItemIndex;
+                    
+                    // Style the button based on active state
+                    btn.className = `w-full py-3 text-sm md:text-base font-serif transition-all duration-300 ${isActive ? data.tagColor + ' font-bold scale-125' : 'text-gray-500 hover:text-gray-300 hover:scale-110 font-medium'}`;
+                    
+                    btn.onclick = () => goToStory(index);
+                    paginationNav.appendChild(btn);
+                });
+            } else {
+                paginationNav.classList.add('hidden');
+            }
+        }
+
+        function goToStory(index) {
+            if (index === currentItemIndex) return;
+            
+            const data = contentData[currentCategory];
+            currentItemIndex = index;
+            const item = data.items[currentItemIndex];
+            
+            const scrollArea = document.querySelector('.overflow-y-auto');
+
+            // Fade out text
+            modalBody.style.opacity = '0';
+            modalTitle.style.opacity = '0';
+            
+            setTimeout(() => {
+                // Update content
+                modalTitle.textContent = item.title;
+                modalBody.innerHTML = item.body;
+                
+                // Fade back in
+                modalBody.style.opacity = '1';
+                modalTitle.style.opacity = '1';
+                
+                // Reset scroll
+                scrollArea.scrollTop = 0;
+                
+                // Re-render pagination to update styles
+                renderPagination(data);
+            }, 300);
+        }
+
+        function openModal(category) {
+            currentCategory = category;
+            currentItemIndex = 0;
+            const data = contentData[category];
+            if(!data) return;
+
+            const item = data.items[0]; 
+            
+            modalTag.textContent = data.tag;
+            // Reset colors and apply the specific category color
+            modalTag.className = `text-xs font-bold uppercase tracking-wider mb-1 block ${data.tagColor}`;
+            
+            modalTitle.textContent = item.title;
+            modalBody.innerHTML = item.body;
+
+            // Render Roman numeral pagination
+            renderPagination(data);
+
+            // Show Modal UI logic
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modal.classList.add('opacity-100');
+            
+            modalContent.classList.remove('translate-y-10', 'scale-95');
+            modalContent.classList.add('translate-y-0', 'scale-100');
+            
+            // Prevent body scroll when reading
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeModal() {
+            // Hide Modal UI logic
+            modal.classList.remove('opacity-100');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            
+            modalContent.classList.remove('translate-y-0', 'scale-100');
+            modalContent.classList.add('translate-y-10', 'scale-95');
+            
+            // Allow body scroll again
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('pointer-events-none')) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
