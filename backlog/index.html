@@ -1,0 +1,2676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--
+  Defence in depth, not a cure. This app is one file with an inline <script>,
+  so script-src needs 'unsafe-inline' and the headline XSS protection is NOT
+  restored — esc() remains the real defence, which matters because public
+  profiles render text written by other people.
+
+  What this policy does buy: connect-src caps where a successful injection
+  could send data, and object-src / base-uri / form-action close the standard
+  vectors. Hashing the inline script would be stronger but needs a build step,
+  which would cost the single-file property.
+
+  connect-src allows any Supabase project so the file stays configurable; it
+  is the only external host the app ever talks to.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  base-uri 'none';
+  object-src 'none';
+  form-action 'none';
+  frame-src 'none';
+  img-src 'self' data:;
+  font-src https://fonts.gstatic.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  script-src 'self' 'unsafe-inline';
+  connect-src 'self' https://*.supabase.co
+">
+<title>Backlogged | Tackle the pile</title>
+<meta name="description" content="A backlog is a decision, not a list. Length, critical reception and your own verdict — enough to pick what to play tonight.">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#08080b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Backlogged">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0e15'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='21' font-weight='600' fill='%23c084fc' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Backlogged — design tokens
+   Inherits the ground, glass and accent family of the writings
+   page (../index.html) so the two read as one site. Deliberately
+   single-theme dark: this is an app you open at night.
+   ============================================================ */
+:root{
+  --ink:#08080b;
+  --ink-2:#0e0e15;
+  --panel:rgba(25,26,40,.85);
+  --panel-2:rgba(36,37,55,.7);
+  --line:rgba(255,255,255,.11);
+  --line-2:rgba(255,255,255,.2);
+  --text:#e8e8f0;
+  --muted:#a2a2be;          /* neutral, biased violet toward the accents */
+  --faint:#8d8dab;          /* small uppercase labels live here — keep it above 4.5:1 */
+  --indigo:#818cf8;
+  --purple:#c084fc;
+  --pink:#f472b6;
+  --sky:#38bdf8;
+  /* semantic — score quality, kept off the accent hues on purpose */
+  --mighty:#34d399;
+  --strong:#a3e635;
+  --fair:#fbbf24;
+  --weak:#f87171;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI Variable','Segoe UI',Roboto,sans-serif;
+  --serif:'Playfair Display','Iowan Old Style','Hoefler Text',Charter,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,'Cascadia Mono',Consolas,monospace;
+  --r:14px;
+  --rail:76px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.55;
+  min-height:100vh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:rgba(129,140,248,.32)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.04);border-radius:10px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.3)}
+
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:6px}
+
+/* ---------- ambient background ---------- */
+.blobs{position:fixed;inset:0;overflow:hidden;z-index:-10;pointer-events:none}
+.blob{position:absolute;width:34rem;height:34rem;border-radius:50%;filter:blur(128px);opacity:.16;animation:blob 22s infinite ease-in-out}
+.blob.i{top:-8rem;left:-8rem;background:#6366f1}
+.blob.p{top:20%;right:-10rem;background:#a855f7;animation-delay:-7s}
+.blob.k{bottom:-12rem;left:25%;background:#ec4899;animation-delay:-14s}
+@keyframes blob{
+  0%,100%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(30px,-50px) scale(1.1)}
+  66%{transform:translate(-20px,20px) scale(.9)}
+}
+
+/* ---------- shared ---------- */
+.glass{
+  background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055), 0 2px 10px rgba(0,0,0,.35);
+}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:600}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600}
+p{margin:0}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+a{color:var(--indigo)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ---------- app frame ---------- */
+.app{display:flex;min-height:100vh}
+
+.rail{
+  position:fixed;left:0;top:0;bottom:0;width:var(--rail);z-index:40;
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;
+  background:rgba(10,10,14,.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-right:1px solid var(--line);
+}
+.rail-mark{font-family:var(--serif);font-size:26px;line-height:1;color:var(--text);margin-bottom:18px;user-select:none}
+.rail-btn{
+  width:52px;padding:9px 0;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:5px;
+  color:var(--faint);transition:color .2s,background .2s;
+}
+.rail-btn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rail-btn span{font-size:9.5px;letter-spacing:.05em;font-weight:600}
+.rail-btn:hover{color:var(--muted);background:rgba(255,255,255,.04)}
+.rail-btn.on{color:var(--text);background:rgba(129,140,248,.14);box-shadow:inset 0 0 0 1px rgba(129,140,248,.28)}
+.rail-spacer{flex:1}
+
+.main{flex:1;margin-left:var(--rail);padding:40px 32px 96px;min-width:0}
+.wrap{max-width:1180px;margin:0 auto}
+/* Only animate when the view actually changes — re-rendering after a filter
+   click or a status change should not replay the entrance. */
+.animate > .view{animation:slideUp .5s cubic-bezier(.22,1,.36,1) both}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* ---------- page head ---------- */
+.phead{margin-bottom:32px}
+.phead h1{font-family:var(--serif);font-size:clamp(30px,4.4vw,46px);font-weight:600;letter-spacing:-.015em;line-height:1.08}
+.phead h1 em{font-style:italic;color:var(--purple)}
+.phead .sub{color:var(--muted);margin-top:10px;max-width:62ch;font-weight:300;font-size:16px}
+
+/* ---------- controls ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{
+  padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.07);
+  color:var(--muted);font-size:13.5px;font-weight:500;transition:all .22s;white-space:nowrap;
+}
+.chip:hover{background:rgba(255,255,255,.09);color:var(--text);border-color:var(--line-2)}
+.chip.on{background:rgba(129,140,248,.16);border-color:rgba(129,140,248,.5);color:#fff;box-shadow:0 0 20px rgba(99,102,241,.22)}
+.chip small{display:block;font-size:11px;color:var(--faint);font-weight:400;margin-top:1px}
+.chip.on small{color:rgba(255,255,255,.6)}
+
+.btn{
+  padding:10px 20px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:#fff;font-size:13.5px;font-weight:500;transition:all .22s;display:inline-flex;align-items:center;gap:8px;
+}
+.btn:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btn.primary{background:rgba(129,140,248,.18);border-color:rgba(129,140,248,.45)}
+.btn.primary:hover{background:rgba(129,140,248,.28);box-shadow:0 0 24px rgba(99,102,241,.3)}
+.btn.ghost{color:var(--muted)}
+.btn.ghost:hover{color:var(--text)}
+.btn.sm{padding:6px 13px;font-size:12.5px}
+
+.field{
+  width:100%;padding:10px 14px;border-radius:10px;background:rgba(0,0,0,.3);
+  border:1px solid var(--line);color:var(--text);font-size:14px;transition:border-color .2s;
+}
+.field:focus{outline:none;border-color:rgba(129,140,248,.55)}
+.field::placeholder{color:var(--faint)}
+textarea.field{resize:vertical;line-height:1.65}
+
+/* ---------- spine (procedural cover art) ---------- */
+.spine{
+  position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;flex-shrink:0;
+  container-type:inline-size;
+  background:
+    linear-gradient(150deg,
+      hsl(var(--h) 62% 46%) 0%,
+      hsl(var(--h) 48% 26%) 46%,
+      hsl(calc(var(--h) + 38) 40% 13%) 100%);
+  display:flex;align-items:flex-end;padding:12px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1), inset 0 -60px 60px -30px rgba(0,0,0,.75);
+}
+.spine::before{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 1px,transparent 1px 7px);
+  mix-blend-mode:overlay;
+}
+.spine::after{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:7px;
+  background:linear-gradient(90deg,rgba(0,0,0,.45),transparent);
+}
+.spine b{
+  position:relative;font-family:var(--serif);font-weight:600;line-height:1.15;
+  /* scales with the tile, so a 74px pick spine and a 112px hero spine both sit right */
+  font-size:clamp(9.5px,13.5cqw,17px);
+  color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.7);letter-spacing:-.01em;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* ---------- shelf grid ---------- */
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:22px}
+.card{text-align:left;display:flex;flex-direction:column;gap:10px;transition:transform .25s cubic-bezier(.22,1,.36,1)}
+.card:hover{transform:translateY(-5px)}
+.card:hover .spine{box-shadow:inset 0 0 0 1px rgba(255,255,255,.2), inset 0 -60px 60px -30px rgba(0,0,0,.75), 0 16px 40px -12px hsl(var(--h) 60% 30% / .8)}
+.card-t{font-size:13.5px;font-weight:600;line-height:1.3;color:var(--text)}
+.card-m{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+
+/* score badge */
+.oc{
+  display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:21px;padding:0 6px;
+  border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:#08080b;
+}
+.oc.mighty{background:var(--mighty)} .oc.strong{background:var(--strong)}
+.oc.fair{background:var(--fair)}     .oc.weak{background:var(--weak)}
+.oc.none{background:rgba(255,255,255,.1);color:var(--faint)}
+
+/* status pill — state encoded in form as well as colour */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:.03em;padding:2px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+.pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.pill.backlog{color:var(--faint);border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.03)}
+.pill.playing{color:var(--sky);border-color:rgba(56,189,248,.35);background:rgba(56,189,248,.1)}
+.pill.completed{color:var(--mighty);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.1)}
+.pill.dropped{color:var(--weak);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)}
+
+/* ---------- tonight ---------- */
+.ask{padding:26px 28px;margin-bottom:26px}
+.ask h2{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:16px}
+.ask-row{display:flex;flex-wrap:wrap;gap:26px}
+.ask-col{flex:1;min-width:270px}
+.ask-col > .eyebrow{display:block;margin-bottom:10px}
+
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.pick{padding:20px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.pick::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(180deg,hsl(var(--h) 70% 60%),transparent)}
+.pick-top{display:flex;gap:15px}
+.pick .spine{width:74px}
+.pick-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.pick-id h3{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.2}
+.pick-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.rank{position:absolute;top:16px;right:18px;font-family:var(--serif);font-size:34px;line-height:1;color:rgba(255,255,255,.07);font-style:italic}
+.why{display:flex;flex-wrap:wrap;gap:7px}
+.why span{font-size:11.5px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+.why span.hi{color:var(--purple);border-color:rgba(192,132,252,.3);background:rgba(192,132,252,.1)}
+.pick-acts{display:flex;gap:9px;margin-top:auto;padding-top:4px}
+
+details.why-these{margin-top:24px;font-size:13px;color:var(--muted)}
+details.why-these summary{cursor:pointer;color:var(--faint);font-size:12.5px;width:fit-content}
+details.why-these summary:hover{color:var(--muted)}
+details.why-these .box{margin-top:12px;padding:16px 18px;line-height:1.7;max-width:70ch}
+details.why-these b{color:var(--text);font-weight:600}
+
+/* ---------- this week ---------- */
+.week{padding:18px 22px;margin-bottom:22px}
+.week-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.week-days{font-size:12px;color:var(--faint)}
+.week-say{font-size:13.5px;color:var(--muted);line-height:1.6;max-width:60ch}
+.week-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,330px));justify-content:start;gap:14px 22px}
+.week-item{display:flex;align-items:center;gap:12px;min-width:0}
+.week-open{flex-shrink:0;width:44px;display:block;border-radius:8px}
+.week-open .spine{width:44px}
+/* at 44px the title is unreadable and the name sits right beside it anyway */
+.week-open .spine b{display:none}
+.week-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.week-id b{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.week-prog{height:5px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.week-prog span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--sky),var(--indigo))}
+.week-meta{font-size:11px;color:var(--faint)}
+.week-drop{color:var(--faint);font-size:17px;line-height:1;padding:4px 6px;border-radius:6px;flex-shrink:0}
+.week-drop:hover{color:var(--weak);background:rgba(255,255,255,.06)}
+
+/* ---------- snoozed ---------- */
+.snoozed{margin-top:20px}
+.snooze-list{display:flex;flex-wrap:wrap;gap:9px}
+.snooze-item{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);
+  padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.snooze-item button{font-size:11px;color:var(--indigo)}
+.snooze-item button:hover{color:#fff;text-decoration:underline}
+
+/* ---------- add / edit form ---------- */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.fspan{grid-column:1/-1}
+.fld{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fld > span{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.01em}
+.fld > span i{font-style:normal;font-weight:400;color:var(--faint);font-size:11px}
+.fsec{margin-top:22px}
+.fsec > .eyebrow{display:block;margin-bottom:6px}
+.fnote{font-size:12.5px;color:var(--faint);line-height:1.55;margin-bottom:12px;max-width:62ch}
+.linkbtn{color:var(--indigo);font-size:inherit;text-decoration:underline;text-underline-offset:2px}
+.linkbtn:hover{color:#fff}
+
+/* ---------- paid / value ---------- */
+.paid{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);margin-left:auto}
+.paid .cur{color:var(--faint)}
+.paid input{width:78px;padding:5px 8px;text-align:right}
+.paid em{font-style:normal;color:var(--mighty);font-size:12px}
+.ahead{font-size:13.5px;color:var(--muted);line-height:1.65;margin-top:14px;max-width:58ch;
+  padding-top:14px;border-top:1px solid var(--line)}
+.ahead b{color:var(--text);font-weight:600}
+.data-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+#jsonOut{margin-top:12px;font-family:var(--mono);font-size:11px;line-height:1.5}
+
+/* ---------- accounts, sync, public shelves ---------- */
+.sync{font-size:9px;letter-spacing:.04em;font-weight:600;text-align:center;color:var(--faint);
+  padding:6px 4px;line-height:1.3;max-width:64px}
+.sync.syncing{color:var(--sky)}
+.sync.synced{color:var(--mighty)}
+.sync.offline,.sync.error{color:var(--fair)}
+.pnote{font-size:13px;color:var(--muted);line-height:1.6;margin-top:8px;max-width:62ch}
+.pnote b{color:var(--text);font-weight:600}
+.pnote code{font-family:var(--mono);font-size:12px;color:var(--indigo)}
+.signin{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+.signin .field{flex:1;min-width:180px}
+.sharebar{gap:18px}
+.tick{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.tick input{accent-color:var(--purple);width:14px;height:14px;cursor:pointer}
+.tick input:disabled{cursor:not-allowed;opacity:.4}
+.pubcard{cursor:default}
+.pubcard:hover{transform:none}
+.pub-h2{font-family:var(--serif);font-size:26px;font-weight:600;margin:38px 0 18px}
+.pubreview{margin-bottom:18px}
+.pubreview h3{font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:14px}
+.pubreview h3 .num{font-size:14px;color:var(--purple);margin-left:8px}
+a.btn{text-decoration:none}
+
+/* ---------- filters rail ---------- */
+.shelf-layout{display:grid;grid-template-columns:212px 1fr;gap:34px;align-items:start}
+/* grid items default to min-width:auto, which lets scroll containers push the page sideways */
+.shelf-layout > *{min-width:0}
+.filters{position:sticky;top:24px;display:flex;flex-direction:column;gap:22px}
+.fgroup > .eyebrow{display:block;margin-bottom:9px}
+.fopts{display:flex;flex-direction:column;gap:2px}
+.fopt{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;
+  padding:6px 10px;border-radius:8px;font-size:13px;color:var(--muted);transition:all .18s;
+}
+.fopt:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.fopt.on{background:rgba(129,140,248,.14);color:#fff}
+.fopt i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.fopt.on i{color:rgba(255,255,255,.55)}
+
+.shelf-bar{display:flex;gap:12px;align-items:center;margin-bottom:22px;flex-wrap:wrap}
+.shelf-bar .field{flex:1;min-width:180px}
+.count{font-size:13px;color:var(--faint);white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{padding:8px 11px;color:var(--faint);display:flex;transition:all .18s}
+.seg button svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.seg button:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.seg button.on{background:rgba(129,140,248,.18);color:#fff}
+
+/* ---------- table view ---------- */
+.tscroll{overflow-x:auto;border-radius:var(--r)}
+table.games{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
+table.games th{
+  text-align:left;padding:11px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+table.games th.s{cursor:pointer}
+table.games th.s:hover{color:var(--muted)}
+table.games td{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:middle}
+table.games tbody tr{cursor:pointer;transition:background .16s}
+table.games tbody tr:hover{background:rgba(255,255,255,.045)}
+table.games .tt{font-weight:600;color:var(--text)}
+table.games .n{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;white-space:nowrap}
+
+.empty{padding:56px 24px;text-align:center;color:var(--faint)}
+.empty b{display:block;font-family:var(--serif);font-size:19px;color:var(--muted);margin-bottom:6px;font-weight:400;font-style:italic}
+
+/* ---------- stats ---------- */
+/* start, not stretch: the scatter panel is tall and would otherwise leave
+   its row-mates as mostly-empty boxes */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:20px;align-items:start}
+.panel{padding:22px 24px}
+.panel > .eyebrow{display:block;margin-bottom:14px}
+.lead,.taste{grid-column:span 2}
+@media(max-width:820px){.lead,.taste{grid-column:span 1}}
+.lead-n{font-family:var(--serif);font-size:clamp(52px,9vw,86px);line-height:.95;font-weight:600;letter-spacing:-.03em;
+  background:linear-gradient(105deg,var(--indigo),var(--purple) 48%,var(--pink));
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+.lead-n small{font-family:var(--sans);font-size:17px;font-weight:400;letter-spacing:0;color:var(--muted);-webkit-text-fill-color:var(--muted);margin-left:12px}
+.lead-say{color:var(--muted);margin-top:12px;max-width:52ch;font-size:14.5px}
+.lead-say b{color:var(--text);font-weight:600}
+.rate{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:13.5px;color:var(--muted)}
+.rate input{width:74px;text-align:center;padding:6px 8px}
+
+.bar{display:flex;height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.05);margin-bottom:14px}
+.bar div{transition:width .5s cubic-bezier(.22,1,.36,1)}
+.legend{display:flex;flex-direction:column;gap:9px}
+.legend div{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted)}
+.legend i{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.legend b{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--text);font-variant-numeric:tabular-nums}
+
+.rows{display:flex;flex-direction:column;gap:11px}
+.row{display:flex;align-items:center;gap:12px;font-size:13.5px;width:100%;text-align:left;color:var(--muted);transition:color .18s}
+.row:hover{color:var(--text)}
+.row .rn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .rv{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--faint);white-space:nowrap}
+.meter{width:clamp(52px,24%,96px);height:6px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden;flex-shrink:0}
+.meter i{display:block;height:100%;border-radius:999px}
+
+.scatter{width:100%;height:auto;display:block;overflow:visible}
+.scatter .ax{stroke:rgba(255,255,255,.1);stroke-width:1}
+.scatter .gr{stroke:rgba(255,255,255,.045);stroke-width:1}
+.scatter .agree{stroke:rgba(255,255,255,.18);stroke-width:1;stroke-dasharray:3 4}
+.scatter text{font-family:var(--sans);font-size:9px;fill:var(--faint)}
+.scatter .lbl{font-size:9.5px;fill:var(--muted)}
+.scatter circle{cursor:pointer}
+
+/* ---------- detail overlay ---------- */
+.scrim{
+  position:fixed;inset:0;z-index:60;background:rgba(4,4,7,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  display:flex;align-items:flex-start;justify-content:center;padding:36px 24px;overflow-y:auto;animation:fadeIn .22s ease-out;
+}
+.sheet{
+  width:100%;max-width:940px;border-radius:20px;background:rgba(15,16,25,.94);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line-2);
+  box-shadow:0 40px 100px -20px rgba(0,0,0,.9);overflow:hidden;
+  animation:sheetIn .4s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes sheetIn{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
+.sheet-hero{position:relative;padding:28px 30px 24px;border-bottom:1px solid var(--line);overflow:hidden}
+.sheet-hero::before{
+  content:"";position:absolute;inset:0;opacity:.2;
+  background:radial-gradient(120% 150% at 8% 0%,hsl(var(--h) 70% 50%) 0%,transparent 62%);
+}
+.hero-in{position:relative;display:flex;gap:22px;align-items:flex-start}
+.hero-in .spine{width:112px}
+.hero-id{flex:1;min-width:0}
+.hero-id h2{font-family:var(--serif);font-size:clamp(24px,3.6vw,34px);font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.hero-sub{color:var(--muted);font-size:13.5px;margin-top:7px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.tag{font-size:11px;padding:3px 9px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+.x{position:absolute;top:18px;right:18px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .2s;z-index:2}
+.x:hover{background:rgba(255,255,255,.1);color:#fff;transform:rotate(90deg)}
+.x svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+/* the triptych: how long · what they thought · what you thought */
+.trip{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+@media(max-width:700px){.trip{grid-template-columns:1fr}}
+.trip > div{padding:22px 26px}
+.trip > div + div{border-left:1px solid var(--line)}
+@media(max-width:700px){.trip > div + div{border-left:none;border-top:1px solid var(--line)}}
+.trip .eyebrow{display:block;margin-bottom:11px}
+.big{font-family:var(--serif);font-size:40px;line-height:1;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.big small{font-family:var(--sans);font-size:14px;font-weight:400;color:var(--muted);margin-left:5px;letter-spacing:0}
+.trip .note{font-size:12px;color:var(--faint);margin-top:9px;line-height:1.5}
+.spread{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5}
+.spread b{color:var(--text);font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600}
+
+.intents{display:flex;gap:5px;margin-top:13px}
+.intent{flex:1;padding:7px 4px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);text-align:center;transition:all .2s}
+.intent:hover{background:rgba(255,255,255,.08)}
+.intent.on{background:rgba(129,140,248,.18);border-color:rgba(129,140,248,.45)}
+.intent b{display:block;font-family:var(--mono);font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
+.intent span{display:block;font-size:9.5px;color:var(--faint);margin-top:2px;letter-spacing:.02em}
+.intent.on span{color:rgba(255,255,255,.6)}
+
+.oc-tier{display:flex;align-items:center;gap:10px;margin-top:4px}
+.tierword{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.quotes{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.quotes .quote{padding-left:11px;border-left:2px solid rgba(255,255,255,.15)}
+.quotes q{display:block;font-family:var(--serif);font-style:italic;font-size:13px;color:var(--muted);line-height:1.5}
+.quotes cite{display:block;font-style:normal;font-family:var(--sans);font-size:10.5px;color:var(--faint);margin-top:4px;letter-spacing:.04em}
+
+.slider{width:100%;margin-top:14px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+.slider::-webkit-slider-runnable-track{height:5px;border-radius:999px;background:linear-gradient(90deg,var(--indigo),var(--purple))}
+.slider::-moz-range-track{height:5px;border-radius:999px;background:linear-gradient(90deg,var(--indigo),var(--purple))}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;margin-top:-6px;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.slider::-moz-range-thumb{width:17px;height:17px;border:none;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+
+.statusbar{display:flex;gap:7px;padding:16px 26px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.statusbar .eyebrow{margin-right:4px}
+
+/* tabs */
+.tabs{display:flex;gap:2px;padding:0 26px;border-bottom:1px solid var(--line)}
+.tab{padding:13px 16px;font-size:13.5px;color:var(--faint);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;font-weight:500}
+.tab:hover{color:var(--muted)}
+.tab.on{color:#fff;border-bottom-color:var(--purple)}
+.tab i{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-left:5px}
+.tabbody{padding:24px 26px 28px}
+
+/* journal */
+.prog{margin-bottom:20px}
+.prog-top{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--muted);margin-bottom:8px}
+.prog-top b{font-family:var(--mono);color:var(--text);font-variant-numeric:tabular-nums}
+.prog-track{height:7px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.prog-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--sky),var(--indigo));transition:width .5s cubic-bezier(.22,1,.36,1)}
+.logrow{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.logrow input{width:66px;text-align:center;padding:6px 8px}
+
+.notes{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+.note-item{display:flex;gap:14px;padding-left:2px}
+.note-when{font-family:var(--mono);font-size:10.5px;color:var(--faint);width:76px;flex-shrink:0;padding-top:3px;letter-spacing:-.02em}
+.note-body{flex:1;min-width:0;font-size:14px;line-height:1.65;color:var(--text);white-space:pre-wrap;word-wrap:break-word;
+  border-left:1px solid var(--line);padding-left:14px}
+.note-del{color:var(--faint);font-size:11px;opacity:0;transition:opacity .18s;align-self:flex-start;padding-top:4px}
+.note-item:hover .note-del{opacity:1}
+.note-del:hover{color:var(--weak)}
+
+/* review — reuse the reading typography of the writings page */
+.review-read{font-family:var(--serif);font-size:17.5px;line-height:1.75;color:#d6d6e2;max-width:64ch}
+.review-read p{margin-bottom:1.1em}
+.review-read p:first-of-type::first-letter{font-size:3.1em;float:left;line-height:.82;padding:4px 10px 0 0;color:var(--purple)}
+.review-empty{font-family:var(--serif);font-style:italic;color:var(--faint);font-size:16px}
+.rev-acts{display:flex;gap:9px;margin-top:18px;align-items:center}
+
+/* history */
+.hist{display:flex;flex-direction:column;gap:0}
+.hist-item{display:flex;gap:14px;align-items:flex-start;padding:10px 0;font-size:13.5px;position:relative}
+.hist-item:not(:last-child)::after{content:"";position:absolute;left:5px;top:22px;bottom:-4px;width:1px;background:var(--line)}
+.hist-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--faint);flex-shrink:0;margin-top:5px;background:var(--ink);z-index:1}
+.hist-dot.playing{border-color:var(--sky)} .hist-dot.completed{border-color:var(--mighty)} .hist-dot.dropped{border-color:var(--weak)}
+.hist-txt{flex:1;color:var(--text)}
+.hist-txt em{font-style:italic;color:var(--muted);display:block;font-size:13px;margin-top:2px}
+.hist-when{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex-shrink:0}
+
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);z-index:80;
+  padding:11px 22px;border-radius:999px;background:rgba(28,29,44,.96);border:1px solid var(--line-2);
+  font-size:13.5px;color:var(--text);box-shadow:0 16px 40px rgba(0,0,0,.6);transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .35s;opacity:0;pointer-events:none;
+}
+.toast.up{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ---------- responsive ---------- */
+@media(max-width:900px){
+  .shelf-layout{grid-template-columns:1fr;gap:24px}
+  .filters{position:static;flex-direction:row;flex-wrap:wrap;gap:20px}
+  .fgroup{min-width:132px}
+  .fopts{flex-direction:row;flex-wrap:wrap}
+}
+@media(max-width:640px){
+  :root{--rail:0px}
+  .main{padding:18px 16px 96px;margin-left:0;padding-bottom:104px}
+  .rail{
+    top:auto;left:0;right:0;bottom:0;width:auto;height:62px;flex-direction:row;justify-content:space-around;
+    padding:0 8px;border-right:none;border-top:1px solid var(--line);
+  }
+  .rail-mark,.rail-spacer{display:none}
+  .rail-btn{width:auto;flex:1;max-width:110px}
+  /* filters become swipeable rows so games start near the top of the screen */
+  /* nowrap matters: a wrapping column container lays items into max-content
+     columns instead of stretching them to the container width */
+  .filters{flex-direction:column;flex-wrap:nowrap;gap:14px}
+  .fgroup{min-width:0}
+  .fopts{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding-bottom:2px;min-width:0}
+  /* .fopt is width:100% in the sidebar layout — in a nowrap row that compounds */
+  .fopt{white-space:nowrap;flex:0 0 auto;width:auto;border:1px solid var(--line);border-radius:999px;padding:6px 13px}
+  .fopt i{margin-left:5px}
+  .shelf{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:16px}
+  .scrim{padding:0}
+  .sheet{border-radius:0;min-height:100vh;max-width:none}
+  .hero-in .spine{width:78px}
+  .tabs{padding:0 16px;overflow-x:auto}
+  .tabbody,.statusbar,.trip > div,.sheet-hero{padding-left:18px;padding-right:18px}
+  .toast{bottom:76px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .card:hover{transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="blobs" aria-hidden="true">
+  <div class="blob i"></div><div class="blob p"></div><div class="blob k"></div>
+</div>
+
+<div class="app">
+  <nav class="rail" aria-label="Sections">
+    <div class="rail-mark" aria-hidden="true">B</div>
+    <button class="rail-btn" data-go="tonight" aria-label="Tonight">
+      <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg><span>TONIGHT</span>
+    </button>
+    <button class="rail-btn" data-go="shelf" aria-label="The Shelf">
+      <svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 012-2h2v18H6a2 2 0 01-2-1.5zM8 21h4V3H8M12 21h3.6a1 1 0 001-.8l2.4-14a1 1 0 00-.8-1.2l-2.6-.4"/></svg><span>SHELF</span>
+    </button>
+    <button class="rail-btn" data-go="stats" aria-label="Your library">
+      <svg viewBox="0 0 24 24"><path d="M3 3v16.5A1.5 1.5 0 004.5 21H21M7 15l3.5-4 3 2.5L20 7"/></svg><span>LIBRARY</span>
+    </button>
+    <button class="rail-btn" data-go="year" aria-label="Your year">
+      <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3.5 9.5h17M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg><span>YEAR</span>
+    </button>
+    <div class="rail-spacer"></div>
+    <span class="sync" id="syncDot" hidden></span>
+  </nav>
+
+  <main class="main"><div class="wrap" id="view"></div></main>
+</div>
+
+<div id="overlay"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   0. BACKEND — optional
+   Paste your Supabase project URL and anon key here to switch on
+   accounts, cross-device sync and public profiles. Leave them empty
+   and the app behaves exactly as it always has: everything local,
+   no network, no sign-in UI anywhere.
+
+   The anon key is MEANT to be public — row-level security is what
+   protects the data, and it is tested in backlog/schema.sql.
+   The service_role key must never appear in this file.
+   ============================================================ */
+const SUPABASE = {
+  url:     "",   // https://YOUR-PROJECT.supabase.co
+  anonKey: ""    // the "anon public" key from Settings → API
+};
+const cloudOn = () => !!(SUPABASE.url && SUPABASE.anonKey);
+
+/* ============================================================
+   1. SEED DATA
+   HowLongToBeat times (hours) and OpenCritic scores are baked in
+   as demo data — neither service is callable from a browser, so
+   everything flows through getGames() to keep a future proxy a
+   one-function change.
+   ============================================================ */
+const SEED = [
+  {id:"bg3",title:"Baldur's Gate 3",year:2023,dev:"Larian Studios",pub:"Larian Studios",genres:["RPG","Turn-Based","Fantasy"],platforms:["PC","PS5","Xbox"],hltb:{main:60,mainExtra:100,completionist:145},oc:{score:96,recommend:98},quotes:[["A staggering achievement — the deepest reactivity an RPG has ever attempted.","PC Gamer"],["Every wild idea you have, it has an answer for.","Eurogamer"]]},
+  {id:"eldenring",title:"Elden Ring",year:2022,dev:"FromSoftware",pub:"Bandai Namco",genres:["Action RPG","Open World"],platforms:["PC","PS5","Xbox"],hltb:{main:58,mainExtra:100,completionist:133},oc:{score:94,recommend:96},quotes:[["The open world finally justified — every horizon hides something authored.","IGN"]]},
+  {id:"persona5",title:"Persona 5 Royal",year:2019,dev:"Atlus",pub:"Sega",genres:["JRPG","Turn-Based","Social Sim"],platforms:["PC","PS5","Switch"],hltb:{main:103,mainExtra:133,completionist:190},oc:{score:94,recommend:98},quotes:[["Style as substance. A hundred hours that never sag.","Polygon"]]},
+  {id:"hades",title:"Hades",year:2020,dev:"Supergiant Games",pub:"Supergiant Games",genres:["Roguelike","Action","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:21,mainExtra:40,completionist:95},oc:{score:93,recommend:98},quotes:[["Failure has never been this narratively generous.","Rock Paper Shotgun"]]},
+  {id:"witcher3",title:"The Witcher 3: Wild Hunt",year:2015,dev:"CD Projekt Red",pub:"CD Projekt",genres:["RPG","Open World","Fantasy"],platforms:["PC","PS5","Switch"],hltb:{main:51,mainExtra:103,completionist:173},oc:{score:92,recommend:97},quotes:[["Side quests with better writing than most games' main stories.","GameSpot"]]},
+  {id:"disco",title:"Disco Elysium",year:2019,dev:"ZA/UM",pub:"ZA/UM",genres:["RPG","Narrative","Indie"],platforms:["PC","PS5","Switch"],hltb:{main:21,mainExtra:30,completionist:45},oc:{score:91,recommend:95},quotes:[["A detective story where the case you crack is yourself.","Waypoint"]]},
+  {id:"celeste",title:"Celeste",year:2018,dev:"Extremely OK Games",pub:"Extremely OK Games",genres:["Platformer","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:8,mainExtra:12.5,completionist:38},oc:{score:91,recommend:97},quotes:[["Difficulty as empathy. Nothing else plays quite this kindly.","Kotaku"]]},
+  {id:"inside",title:"Inside",year:2016,dev:"Playdead",pub:"Playdead",genres:["Puzzle","Platformer","Indie"],platforms:["PC","PS5","Switch"],hltb:{main:3.5,mainExtra:4,completionist:6},oc:{score:91,recommend:96},quotes:[["Not a word spoken, and you will not stop thinking about it.","Edge"]]},
+  {id:"sekiro",title:"Sekiro: Shadows Die Twice",year:2019,dev:"FromSoftware",pub:"Activision",genres:["Action","Souls-like"],platforms:["PC","PS5","Xbox"],hltb:{main:29,mainExtra:40,completionist:70},oc:{score:89,recommend:93},quotes:[["Combat as conversation — and it is not interested in your excuses.","VG247"]]},
+  {id:"obradinn",title:"Return of the Obra Dinn",year:2018,dev:"Lucas Pope",pub:"3909 LLC",genres:["Puzzle","Mystery","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:8,mainExtra:9.5,completionist:12},oc:{score:89,recommend:95},quotes:[["The rare deduction game that trusts you completely.","PC Gamer"]]},
+  {id:"davethediver",title:"Dave the Diver",year:2023,dev:"Mintrocket",pub:"Nexon",genres:["Adventure","Management","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:22,mainExtra:32,completionist:47},oc:{score:89,recommend:94},quotes:[["It should not work. It absolutely works.","Destructoid"]]},
+  {id:"slaythespire",title:"Slay the Spire",year:2019,dev:"Mega Crit",pub:"Mega Crit",genres:["Roguelike","Deckbuilder","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:27,mainExtra:62,completionist:155},oc:{score:89,recommend:94},quotes:[["The deckbuilder every other deckbuilder is measured against.","Rock Paper Shotgun"]]},
+  {id:"outerwilds",title:"Outer Wilds",year:2019,dev:"Mobius Digital",pub:"Annapurna",genres:["Adventure","Puzzle","Exploration"],platforms:["PC","PS5","Switch"],hltb:{main:15.5,mainExtra:22,completionist:32},oc:{score:88,recommend:93},quotes:[["Knowledge is the only upgrade, and it is the best one.","Eurogamer"]]},
+  {id:"hifirush",title:"Hi-Fi Rush",year:2023,dev:"Tango Gameworks",pub:"Bethesda",genres:["Action","Rhythm"],platforms:["PC","Xbox","PS5"],hltb:{main:12.5,mainExtra:16,completionist:24},oc:{score:88,recommend:96},quotes:[["Every single thing on screen is on the beat. Every one.","GamesRadar"]]},
+  {id:"titanfall2",title:"Titanfall 2",year:2016,dev:"Respawn",pub:"EA",genres:["Shooter","Action"],platforms:["PC","PS5","Xbox"],hltb:{main:6.5,mainExtra:9,completionist:16},oc:{score:88,recommend:94},quotes:[["Six hours that other shooters spend sixty failing to match.","IGN"]]},
+  {id:"cyberpunk",title:"Cyberpunk 2077",year:2020,dev:"CD Projekt Red",pub:"CD Projekt",genres:["RPG","Shooter","Open World"],platforms:["PC","PS5","Xbox"],hltb:{main:25,mainExtra:62,completionist:106},oc:{score:86,recommend:88},quotes:[["Night City is the best-realised place in the medium.","GameSpot"]]},
+  {id:"pentiment",title:"Pentiment",year:2022,dev:"Obsidian",pub:"Xbox Game Studios",genres:["Adventure","Narrative","RPG"],platforms:["PC","Xbox","Switch"],hltb:{main:17,mainExtra:22,completionist:30},oc:{score:86,recommend:91},quotes:[["An illuminated manuscript you get to argue with.","Polygon"]]},
+  {id:"chants",title:"Chants of Sennaar",year:2023,dev:"Rundisc",pub:"Focus Entertainment",genres:["Puzzle","Adventure","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:10,mainExtra:12.5,completionist:17},oc:{score:83,recommend:89},quotes:[["You learn a language by needing it. Quietly brilliant.","Rock Paper Shotgun"]]}
+];
+
+/* First run leaves a lived-in shelf: things finished, things playing,
+   one honest abandonment, and a lot of good intentions. */
+const D = 864e5;
+const FIRST_RUN = [
+  ["eldenring",   {status:"completed",intent:"mainExtra",   added:800, started:790, finished:700, score:9.5, hours:96}],
+  ["hades",       {status:"completed",intent:"main",        added:900, started:880, finished:820, score:9,   hours:46}],
+  ["celeste",     {status:"completed",intent:"main",        added:950, started:930, finished:900, score:8.5, hours:14}],
+  ["slaythespire",{status:"completed",intent:"main",        added:1100,started:1080,finished:1000,score:8,   hours:60}],
+  ["disco",       {status:"playing",  intent:"main",        added:500, started:40,  hours:12}],
+  ["davethediver",{status:"playing",  intent:"main",        added:120, started:20,  hours:9}],
+  ["cyberpunk",   {status:"dropped",  intent:"main",        added:700, started:660, finished:640, hours:11,
+                   reason:"Bounced off the driving and never went back. Maybe after the expansion."}],
+  ["witcher3",    {status:"backlog",  intent:"completionist",added:1200}],
+  ["bg3",         {status:"backlog",  intent:"main",        added:420}],
+  ["hifirush",    {status:"backlog",  intent:"main",        added:340}],
+  ["obradinn",    {status:"backlog",  intent:"main",        added:610}],
+  ["outerwilds",  {status:"backlog",  intent:"main",        added:380}],
+  ["sekiro",      {status:"backlog",  intent:"main",        added:450}],
+  ["inside",      {status:"backlog",  intent:"main",        added:300}],
+  ["persona5",    {status:"backlog",  intent:"main",        added:260}],
+  ["pentiment",   {status:"backlog",  intent:"main",        added:200}],
+  ["chants",      {status:"backlog",  intent:"main",        added:90}],
+  ["titanfall2",  {status:"backlog",  intent:"main",        added:1000}]
+];
+
+/* ============================================================
+   2. STORE
+   ============================================================ */
+const KEY = "backlog:v1";
+const INTENTS = {main:"Main", mainExtra:"Main + Extras", completionist:"Completionist"};
+const STATUSES = {backlog:"Backlog", playing:"Playing", completed:"Completed", dropped:"Dropped"};
+
+let state, ui = {view:"tonight", appetite:null, mood:null, mode:"grid", tab:"journal",
+                 q:"", status:"all", length:"all", sort:"added", editingReview:false,
+                 showSnoozed:false, showData:false};
+
+/* The catalogue is the seed list plus whatever the user has added. Every view
+   reads through these two functions, so nothing else needs to know the difference
+   — and a future HLTB/OpenCritic proxy still swaps in here. */
+function getGames(){ return SEED.concat(state && state.custom ? state.custom : []); }
+function game(id){ return getGames().find(g => g.id === id); }
+function isCustom(id){ return !!(state.custom && state.custom.some(g => g.id === id)); }
+
+function blankEntry(){
+  return {status:"backlog", intent:"main", added:Date.now(), started:null, finished:null,
+          score:null, hours:0, price:null, hltbOverride:null, reason:"", notes:[], review:"", snoozed:0, history:[],
+          sessions:[],   // {at, hours} — hours alone carries no date, so a year view needs these
+          updatedAt:Date.now(), shared:false, shareReview:false};
+}
+
+function firstRun(){
+  const now = Date.now(), entries = {};
+  for (const [id, s] of FIRST_RUN){
+    const e = blankEntry();
+    e.status = s.status; e.intent = s.intent;
+    e.added = now - s.added * D;
+    e.started = s.started != null ? now - s.started * D : null;
+    e.finished = s.finished != null ? now - s.finished * D : null;
+    e.score = s.score ?? null; e.hours = s.hours ?? 0; e.reason = s.reason || "";
+    e.history = [{at:e.added, status:"backlog", note:""}];
+    if (e.started)  e.history.push({at:e.started,  status:"playing",  note:""});
+    if (e.finished) e.history.push({at:e.finished, status:s.status,   note:s.reason || ""});
+    entries[id] = e;
+  }
+  entries.disco.notes = [
+    {at:now - 38*D, text:"Failed a Composure check in the first ten minutes and my tie started talking to me. Keeping this save."},
+    {at:now - 12*D, text:"Kim Kitsuragi is the best companion character in the medium and it is not close."}
+  ];
+  entries.eldenring.review =
+    "I put ninety-six hours into this and the moment I keep returning to is not a boss.\n\n" +
+    "It is the first time I crested the hill out of Limgrave at night and saw the golden tree just sitting there on the horizon, enormous and indifferent, with no marker, no quest, no voice telling me it mattered. I stood still for a while. Then I went the other way, because I could.\n\n" +
+    "That is the whole trick. Every other open world hands you a map studded with icons and calls it freedom. This one hands you a horizon and trusts that curiosity is enough. It nearly always is.";
+  entries.hades.review =
+    "The genius of it is that dying is the story.\n\n" +
+    "Every other roguelike treats a failed run as lost time. Here the failure is the delivery mechanism — you crawl back up out of the Styx and someone has something new to say to you about it. Two hundred escape attempts and I never once resented the walk back to the courtyard.";
+  // A few prices, so cost-per-hour has something to say on first run.
+  const paid = {eldenring:49.99, hades:19.99, celeste:8.99, slaythespire:16.99,
+                disco:34.99, davethediver:17.99, cyberpunk:44.99, witcher3:24.99};
+  for (const id in paid) if (entries[id]) entries[id].price = paid[id];
+
+  return {entries, custom:[], week:{startedAt:0, ids:[]}, prefs:{weekly:8, currency:"£"},
+          seeded:true, updatedAt:Date.now()};
+}
+
+/* Older saves predate custom games, the weekly shortlist and prices. */
+function migrate(p){
+  if (!Array.isArray(p.custom)) p.custom = [];
+  if (!p.week || !Array.isArray(p.week.ids)) p.week = {startedAt:0, ids:[]};
+  p.prefs = p.prefs || {};
+  if (p.prefs.weekly == null) p.prefs.weekly = 8;
+  if (!p.prefs.currency) p.prefs.currency = "£";
+  if (p.updatedAt == null) p.updatedAt = Date.now();
+  if (p.seeded == null) p.seeded = false;
+  for (const id in p.entries){
+    const e = p.entries[id];
+    if (e.price === undefined) e.price = null;
+    if (e.updatedAt == null) e.updatedAt = p.updatedAt;   // merge needs a stamp
+    if (e.hltbOverride === undefined) e.hltbOverride = null;
+    // Deliberately NOT back-filled from e.hours: those hours have no date, and
+    // inventing one would put fabricated time in a year summary.
+    if (!Array.isArray(e.sessions)) e.sessions = [];
+    if (e.shared === undefined) e.shared = false;         // public profile opt-in
+    if (e.shareReview === undefined) e.shareReview = false;
+    if (!Array.isArray(e.history)) e.history = [];
+  }
+  return p;
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if (raw){
+      const p = JSON.parse(raw);
+      if (p && p.entries) return migrate(p);
+    }
+  } catch(err){ /* corrupt or unavailable storage — fall through to a clean shelf */ }
+  // Persist the seed straight away: "added" dates are generated relative to now,
+  // so without this they'd silently reset on every visit and nothing would age.
+  const fresh = firstRun();
+  try{ localStorage.setItem(KEY, JSON.stringify(fresh)); } catch(err){ /* private mode — run in memory */ }
+  return fresh;
+}
+/* `touched` is the game whose entry just changed. Stamping it is what lets
+   two devices that edited different games both keep their work on merge. */
+function save(touched){
+  const now = Date.now();
+  if (touched && state.entries[touched]) state.entries[touched].updatedAt = now;
+  state.updatedAt = now;
+  state.seeded = false;                       // any save means real user data
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch(err){ toast("Couldn't save — storage is full or blocked."); }
+  queuePush();
+}
+function entry(id){
+  if (!state.entries[id]) state.entries[id] = blankEntry();
+  return state.entries[id];
+}
+
+/* ============================================================
+   2b. ACCOUNTS AND SYNC — all optional
+   Plain fetch against Supabase's GoTrue and PostgREST endpoints, so
+   the app stays one file with no dependencies. Every function here
+   is a no-op when SUPABASE is unconfigured.
+   ============================================================ */
+const AUTH_KEY = "backlog:auth";
+let session = null;          // {access_token, refresh_token, expires_at, user}
+let profile = null;          // {handle, display_name, bio, is_public}
+let remoteRev = 0;           // last rev we know the server had
+let syncStatus = "off";      // off | local | syncing | synced | offline | conflict | error
+let pushTimer = null, pushPending = false, pushing = false, authNotice = "";
+
+const signedIn = () => !!(session && session.user);
+
+function readSession(){
+  try{ return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch(err){ return null; }
+}
+function writeSession(s){
+  session = s;
+  try{
+    if (s) localStorage.setItem(AUTH_KEY, JSON.stringify(s));
+    else localStorage.removeItem(AUTH_KEY);
+  } catch(err){ /* private mode */ }
+}
+function redirectBase(){ return location.href.split("#")[0]; }
+
+/* GoTrue hands tokens back in the URL *fragment*, which is also where our
+   router lives. This must run before any routing or sign-in reads as a
+   broken route. */
+function captureAuthFragment(){
+  const raw = location.hash || "";
+  if (!/[#&](access_token|error|error_description)=/.test(raw)) return;
+
+  const p = new URLSearchParams(raw.replace(/^#/, ""));
+  const err = p.get("error_description") || p.get("error");
+  const at = p.get("access_token");
+
+  // strip the credentials out of the address bar immediately
+  history.replaceState(null, "", location.pathname + location.search + "#/tonight");
+
+  if (err){ authNotice = decodeURIComponent(err.replace(/\+/g, " ")); return; }
+  if (!at) return;
+
+  writeSession({
+    access_token: at,
+    refresh_token: p.get("refresh_token") || "",
+    expires_at: Date.now() + (parseInt(p.get("expires_in"), 10) || 3600) * 1000,
+    user: null                                  // filled in by fetchUser()
+  });
+  authNotice = "Signed in.";
+}
+
+async function api(path, opts){
+  opts = opts || {};
+  const headers = Object.assign({
+    apikey: SUPABASE.anonKey,
+    "Content-Type": "application/json"
+  }, opts.headers || {});
+  if (session && session.access_token) headers.Authorization = "Bearer " + session.access_token;
+
+  const res = await fetch(SUPABASE.url + path, Object.assign({}, opts, {headers}));
+  if (res.status === 401 && !opts._retried && session && session.refresh_token){
+    if (await refreshSession()) return api(path, Object.assign({}, opts, {_retried:true}));
+  }
+  return res;
+}
+
+async function refreshSession(){
+  try{
+    const res = await fetch(SUPABASE.url + "/auth/v1/token?grant_type=refresh_token", {
+      method:"POST",
+      headers:{apikey:SUPABASE.anonKey, "Content-Type":"application/json"},
+      body: JSON.stringify({refresh_token: session.refresh_token})
+    });
+    if (!res.ok){ writeSession(null); return false; }
+    const j = await res.json();
+    writeSession({
+      access_token: j.access_token, refresh_token: j.refresh_token,
+      expires_at: Date.now() + (j.expires_in || 3600) * 1000,
+      user: j.user || (session && session.user) || null
+    });
+    return true;
+  } catch(err){ return false; }
+}
+
+async function fetchUser(){
+  const res = await api("/auth/v1/user");
+  if (!res.ok) return false;
+  const u = await res.json();
+  session.user = {id:u.id, email:u.email};
+  writeSession(session);
+  return true;
+}
+
+async function signInWithEmail(email){
+  const res = await api("/auth/v1/otp?redirect_to=" + encodeURIComponent(redirectBase()), {
+    method:"POST", body: JSON.stringify({email, create_user:true})
+  });
+  if (res.ok) return toast("Check your email for the link.");
+  const j = await res.json().catch(() => ({}));
+  toast(j.msg || j.error_description || "Couldn't send the link.");
+}
+
+function signInWithProvider(provider){
+  location.href = SUPABASE.url + "/auth/v1/authorize?provider=" + encodeURIComponent(provider) +
+                  "&redirect_to=" + encodeURIComponent(redirectBase());
+}
+
+async function signOut(){
+  try{ await api("/auth/v1/logout", {method:"POST"}); } catch(err){ /* going anyway */ }
+  writeSession(null);
+  profile = null; remoteRev = 0; syncStatus = "local";
+  toast("Signed out. Your games are still here on this device.");
+  render();
+}
+
+/* ---- merge -------------------------------------------------------------
+   Per-game last-write-wins, which resolves the realistic case (two devices
+   touched different games) without loss. Notes and history are append-only
+   so they union instead — a note should never be destroyed by a merge. */
+function mergeDocs(mine, theirs){
+  const out = JSON.parse(JSON.stringify(theirs));
+  out.entries = out.entries || {};
+  out.custom  = Array.isArray(out.custom) ? out.custom : [];
+
+  for (const id in (mine.entries || {})){
+    const a = mine.entries[id], b = out.entries[id];
+    if (!b){ out.entries[id] = a; continue; }
+
+    const aWins = (a.updatedAt || 0) >= (b.updatedAt || 0);
+    const merged = JSON.parse(JSON.stringify(aWins ? a : b));
+    const other  = aWins ? b : a;
+
+    const notes = (merged.notes || []).slice();
+    const seen = new Set(notes.map(n => n.at));
+    for (const n of (other.notes || [])) if (!seen.has(n.at)){ notes.push(n); seen.add(n.at); }
+    merged.notes = notes.sort((x, y) => x.at - y.at);
+
+    const hist = (merged.history || []).slice();
+    const hseen = new Set(hist.map(h => h.at + ":" + h.status));
+    for (const h of (other.history || [])){
+      const k = h.at + ":" + h.status;
+      if (!hseen.has(k)){ hist.push(h); hseen.add(k); }
+    }
+    merged.history = hist.sort((x, y) => x.at - y.at);
+
+    // sessions are append-only like notes — union rather than pick a side
+    const sess = (merged.sessions || []).slice();
+    const sseen = new Set(sess.map(s => s.at + ":" + s.hours));
+    for (const s of (other.sessions || [])){
+      const k = s.at + ":" + s.hours;
+      if (!sseen.has(k)){ sess.push(s); sseen.add(k); }
+    }
+    merged.sessions = sess.sort((x, y) => x.at - y.at);
+
+    merged.hours = Math.max(a.hours || 0, b.hours || 0);   // hours only ever go up
+    out.entries[id] = merged;
+  }
+
+  const have = new Set(out.custom.map(g => g.id));
+  for (const g of (mine.custom || [])) if (!have.has(g.id)) out.custom.push(g);
+
+  if ((mine.updatedAt || 0) > (theirs.updatedAt || 0)){
+    out.week = mine.week; out.prefs = mine.prefs;
+  }
+  out.updatedAt = Math.max(mine.updatedAt || 0, theirs.updatedAt || 0);
+  out.seeded = false;
+  return out;
+}
+
+/* ---- push / pull ------------------------------------------------------- */
+async function pullRemote(){
+  const res = await api("/rest/v1/libraries?select=doc,rev&user_id=eq." + session.user.id);
+  if (!res.ok) return null;
+  const rows = await res.json();
+  if (!rows.length) return null;
+  remoteRev = rows[0].rev;
+  return rows[0].doc;
+}
+
+async function pushRemote(){
+  const uid = session.user.id;
+  const body = {doc: state, rev: remoteRev + 1};
+
+  if (remoteRev === 0){
+    const res = await api("/rest/v1/libraries", {
+      method:"POST", headers:{Prefer:"return=representation"},
+      body: JSON.stringify(Object.assign({user_id: uid}, body))
+    });
+    if (res.ok){ const r = await res.json(); remoteRev = (r[0] && r[0].rev) || 1; return true; }
+    if (res.status !== 409) return false;      // 409 = row already there, fall through
+    const cur = await pullRemote();
+    if (cur == null) return false;
+  }
+
+  // rev guard: zero rows back means another device wrote first
+  const res = await api("/rest/v1/libraries?user_id=eq." + uid + "&rev=eq." + remoteRev, {
+    method:"PATCH", headers:{Prefer:"return=representation"},
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) return false;
+  const rows = await res.json();
+  if (!rows.length) return "conflict";
+  remoteRev = rows[0].rev;
+  return true;
+}
+
+function setSync(s){ if (syncStatus !== s){ syncStatus = s; paintSync(); } }
+
+function queuePush(){
+  if (!cloudOn() || !signedIn()) return;
+  pushPending = true;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(flushPush, 2000);
+}
+
+async function flushPush(){
+  if (!cloudOn() || !signedIn() || !pushPending) return;
+  // 'online' and 'focus' routinely fire together, and two concurrent pushes
+  // race each other for the rev guard — the loser then reports a failure that
+  // never happened.
+  if (pushing) return;
+  if (!navigator.onLine) return setSync("offline");
+
+  pushing = true;
+  setSync("syncing");
+  try{
+    let r = await pushRemote();
+    if (r === "conflict"){
+      const theirs = await pullRemote();
+      if (theirs){
+        state = migrate(mergeDocs(state, theirs));
+        try{ localStorage.setItem(KEY, JSON.stringify(state)); } catch(err){}
+        r = await pushRemote();
+        render();
+        toast("Merged changes from another device.");
+      }
+    }
+    if (r === true){ pushPending = false; setSync("synced"); }
+    else {
+      setSync("error");
+      clearTimeout(pushTimer);              // the label promises a retry, so retry
+      pushTimer = setTimeout(flushPush, 4000);
+    }
+  } catch(err){
+    setSync(navigator.onLine ? "error" : "offline");
+  } finally {
+    pushing = false;
+  }
+}
+
+/* First sign-in: decide between adopting what's on this device, pulling what
+   the account already has, or merging both. Never silently discard either. */
+async function syncOnSignIn(){
+  setSync("syncing");
+  const theirs = await pullRemote();
+
+  if (theirs == null){
+    pushPending = true;
+    await flushPush();
+    return;
+  }
+  if (state.seeded){
+    state = migrate(theirs);
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); } catch(err){}
+    setSync("synced");
+    toast("Loaded your library.");
+    return;
+  }
+  state = migrate(mergeDocs(state, theirs));
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); } catch(err){}
+  pushPending = true;
+  await flushPush();
+  toast("Merged this device with your account.");
+}
+
+async function fetchProfile(){
+  const res = await api("/rest/v1/profiles?select=handle,display_name,bio,is_public,share_year&id=eq." + session.user.id);
+  if (!res.ok) return;
+  const rows = await res.json();
+  profile = rows[0] || {handle:null, display_name:null, bio:null, is_public:false, share_year:false};
+}
+
+async function startCloud(){
+  if (!cloudOn()) { syncStatus = "off"; return; }
+  syncStatus = "local";
+  if (!session) return;
+  if (session.expires_at && session.expires_at < Date.now() + 60000){
+    if (!await refreshSession()) return;
+  }
+  if (!session.user && !await fetchUser()){ writeSession(null); return; }
+  await fetchProfile();
+  await syncOnSignIn();
+  render();
+}
+
+/* ============================================================
+   3. HELPERS
+   ============================================================ */
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+const days = ts => Math.max(0, Math.floor((Date.now() - ts) / D));
+const hrs  = h => (h % 1 === 0 ? h : h.toFixed(1)) + "h";
+
+function hue(id){                                  // stable colour per title
+  let n = 0;
+  for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
+  return n % 360;
+}
+function tier(s){ return s >= 90 ? "mighty" : s >= 80 ? "strong" : s >= 70 ? "fair" : "weak"; }
+function tierWord(s){ return s >= 90 ? "Mighty" : s >= 80 ? "Strong" : s >= 70 ? "Fair" : "Weak"; }
+/* A user-added game may have no length at all. Say so rather than inventing one. */
+function hasLength(g){ return knownIntents(g).length > 0; }
+function knownIntents(g){ return Object.keys(INTENTS).filter(k => g.hltb && g.hltb[k] != null); }
+
+/* Your own estimate beats the crowd's. HowLongToBeat figures are widely held to
+   run long — completionist worst — so any game's estimate can be replaced, and
+   every length figure in the app flows through here. */
+function lengthOf(g, e){
+  if (e && e.hltbOverride != null) return e.hltbOverride;
+  if (!g.hltb) return 0;
+  if (g.hltb[e.intent] != null) return g.hltb[e.intent];
+  const first = knownIntents(g)[0];
+  return first ? g.hltb[first] : 0;
+}
+
+/* The genuine spread across this game's own intents — real data, not a
+   synthesised error bar. Returns null when there is nothing to spread. */
+function lengthRange(g){
+  const vals = knownIntents(g).map(k => g.hltb[k]).filter(v => v > 0);
+  if (vals.length < 2) return null;
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  return lo === hi ? null : {lo, hi};
+}
+function remaining(g, e){ return Math.max(0, lengthOf(g, e) - e.hours); }
+function bucket(h){ return h < 10 ? "short" : h < 25 ? "mid" : h < 60 ? "long" : "epic"; }
+function money(n){ return (state.prefs.currency || "£") + n.toFixed(2); }
+
+function whenText(ts){
+  const d = days(ts);
+  if (d === 0) return "today";
+  if (d === 1) return "yesterday";
+  if (d < 30)  return d + "d ago";
+  if (d < 365) return Math.round(d / 30) + "mo ago";
+  const y = (d / 365).toFixed(1).replace(/\.0$/, "");
+  return y + "y ago";
+}
+function dateText(ts){
+  return new Date(ts).toLocaleDateString(undefined, {day:"numeric", month:"short", year:"numeric"});
+}
+
+/* average of your own scores, by genre — feeds the Tonight ranking */
+function affinity(){
+  const acc = {};
+  for (const g of getGames()){
+    const e = state.entries[g.id];
+    if (!e || e.score == null) continue;
+    for (const gen of g.genres) (acc[gen] = acc[gen] || []).push(e.score);
+  }
+  const out = {};
+  for (const k in acc) out[k] = acc[k].reduce((a,b) => a + b, 0) / acc[k].length;
+  return out;
+}
+function affinityFor(g, aff){
+  const hits = g.genres.map(x => aff[x]).filter(x => x != null);
+  return hits.length ? hits.reduce((a,b) => a + b, 0) / hits.length : null;
+}
+
+function spine(g, cls){
+  return '<div class="spine ' + (cls || "") + '" style="--h:' + hue(g.id) + '"><b>' + esc(g.title) + "</b></div>";
+}
+function ocBadge(g){
+  if (!g.oc || g.oc.score == null) return '<span class="oc none" title="No critic score">–</span>';
+  return '<span class="oc ' + tier(g.oc.score) + '">' + g.oc.score + "</span>";
+}
+
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("up");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("up"), 2400);
+}
+
+/* ============================================================
+   4. TONIGHT — the ranking
+   ============================================================ */
+const APPETITES = {
+  short:   {label:"A couple of hours", hint:"~2h tonight",     target:8},
+  evening: {label:"An evening",        hint:"~5h tonight",     target:18},
+  weekend: {label:"A long weekend",    hint:"~15h to give",    target:55}
+};
+const MOODS = {
+  great:  {label:"Short and great",  hint:"quality per hour"},
+  sink:   {label:"Something to sink into", hint:"the long haul"},
+  finish: {label:"Finish what I started",  hint:"already playing"}
+};
+/* The critic score matters most when we know nothing about you, and least once
+   you have opinions of your own on record. This audience distrusts aggregate
+   scores precisely because they cannot account for personal taste — so weight
+   shifts from the critics to you as evidence accumulates. With no ratings it
+   behaves exactly as it always has; by about a dozen your taste outweighs them. */
+const BASE_WEIGHTS = {fit:.40, critical:.25, neglect:.20, taste:.15};
+/* Calibrated so the crossover lands at ~10 rated games, not 4 — a handful of
+   scores is not yet evidence, and the seeded shelf already carries four. The
+   ceiling keeps the critics at 12%: still useful signal for the many games you
+   have no opinion on. */
+const SHIFT_PER_RATING = .005;
+const MAX_SHIFT = .13;
+
+function ratedCount(){
+  let n = 0;
+  for (const g of getGames()) if ((state.entries[g.id] || {}).score != null) n++;
+  return n;
+}
+function weights(){
+  const shift = Math.min(MAX_SHIFT, ratedCount() * SHIFT_PER_RATING);
+  return {fit:BASE_WEIGHTS.fit, neglect:BASE_WEIGHTS.neglect,
+          critical:BASE_WEIGHTS.critical - shift, taste:BASE_WEIGHTS.taste + shift};
+}
+const pct = w => Math.round(w * 100);
+
+function candidates(){
+  const app = APPETITES[ui.appetite];
+  if (!app) return [];
+  const aff = affinity(), now = Date.now(), W = weights();
+  const pool = getGames().filter(g => {
+    const e = entry(g.id);
+    if (e.snoozed > now) return false;
+    return ui.mood === "finish" ? e.status === "playing"
+                                : e.status === "backlog" || e.status === "playing";
+  });
+
+  const scored = pool.map(g => {
+    const e = entry(g.id);
+    const known = hasLength(g);
+    const left = remaining(g, e) || lengthOf(g, e);
+    let target = app.target;
+    if (ui.mood === "great") target *= .7;
+    if (ui.mood === "sink")  target *= 2.2;
+
+    // closeness on a log scale: being 2x off matters far less than 20x off.
+    // Unknown length scores neutrally rather than being punished or invented.
+    const fit = known ? Math.max(0, 1 - Math.abs(Math.log(left / target)) / Math.log(7)) : .5;
+    const hasOC = !!(g.oc && g.oc.score != null);
+    const critical = hasOC ? g.oc.score / 100 : .75;
+    const neglect  = Math.min(1, days(e.added) / 500);
+    const a = affinityFor(g, aff);
+    const taste = a != null ? a / 10 : .7;
+
+    let total = W.fit*fit + W.critical*critical + W.neglect*neglect + W.taste*taste;
+    if (ui.mood === "great")  total += critical * .12;
+    if (ui.mood === "finish") total += .1;
+
+    const why = [];
+    if (!known)         why.push({t:"Length unknown", hi:false});
+    else if (fit > .72) why.push({t:hrs(left) + " left — fits " + app.label.toLowerCase(), hi:true});
+    else if (fit > .45) why.push({t:hrs(left) + " left", hi:false});
+    else                why.push({t:hrs(left) + " — a stretch for tonight", hi:false});
+    if (hasOC)          why.push({t:g.oc.score + " on OpenCritic", hi:critical >= .9});
+    if (neglect > .6)   why.push({t:"Sat " + days(e.added) + " days untouched", hi:true});
+    if (a != null && a >= 8.5) why.push({t:"You rate " + g.genres[0] + " " + a.toFixed(1) + " on average", hi:true});
+    if (e.status === "playing" && known) why.push({t:"Already " + Math.round(e.hours / lengthOf(g,e) * 100) + "% in", hi:true});
+    else if (e.status === "playing")     why.push({t:hrs(e.hours) + " in already", hi:true});
+
+    return {g, e, total, why};
+  });
+
+  scored.sort((a, b) => b.total - a.total);
+  return scored.slice(0, 3);
+}
+
+/* ---- "This week": a small commitment, deliberately not a streak ----
+   Community backlog challenges are seasonal and low-stakes. Nothing here
+   punishes you for a quiet week; it just remembers where you left off. */
+const WEEK_MS = 7 * D;
+function weekLive(){ return !!state.week.startedAt && Date.now() - state.week.startedAt < WEEK_MS; }
+function weekIds(){ return weekLive() ? state.week.ids.filter(id => game(id)) : []; }
+function addToWeek(id){
+  if (!weekLive()) state.week = {startedAt:Date.now(), ids:[]};
+  if (!state.week.ids.includes(id)) state.week.ids.push(id);
+  save();
+}
+
+function weekStrip(){
+  const ids = weekIds();
+  const stale = !weekLive() && state.week.ids.length > 0;
+
+  if (stale){
+    return '<section class="week glass"><div class="week-head">' +
+      '<span class="eyebrow">Last week</span>' +
+      '<button class="btn ghost sm" data-newweek="1">Start a fresh week</button></div>' +
+      '<p class="week-say">That week has run its course. No score attached — pick again whenever you feel like it.</p></section>';
+  }
+  if (!ids.length) return "";
+
+  const left = Math.max(0, Math.ceil((state.week.startedAt + WEEK_MS - Date.now()) / D));
+  return '<section class="week glass"><div class="week-head">' +
+    '<span class="eyebrow">This week</span>' +
+    '<span class="week-days num">' + left + (left === 1 ? " day left" : " days left") + "</span></div>" +
+    '<div class="week-list">' + ids.map(id => {
+      const g = game(id), e = entry(id);
+      const known = hasLength(g);
+      const wpct = known ? Math.min(100, Math.round(e.hours / lengthOf(g, e) * 100)) : 0;
+      return '<div class="week-item" style="--h:' + hue(id) + '">' +
+        '<button class="week-open" data-open="' + id + '">' + spine(g) + "</button>" +
+        '<div class="week-id"><b>' + esc(g.title) + "</b>" +
+          '<div class="week-prog"><span style="width:' + wpct + '%"></span></div>' +
+          '<span class="week-meta num">' + (known ? hrs(e.hours) + " of ~" + hrs(lengthOf(g, e)) + " · " + wpct + "%"
+                                                  : hrs(e.hours) + " played") + "</span>" +
+        "</div>" +
+        '<button class="week-drop" data-unweek="' + id + '" aria-label="Remove from this week">×</button>' +
+      "</div>";
+    }).join("") + "</div></section>";
+}
+
+function snoozedStrip(){
+  const now = Date.now();
+  const list = getGames().filter(g => entry(g.id).snoozed > now);
+  if (!list.length) return "";
+  return '<details class="why-these snoozed"' + (ui.showSnoozed ? " open" : "") + '><summary>' +
+    list.length + (list.length === 1 ? " game snoozed" : " games snoozed") + "</summary>" +
+    '<div class="box glass"><div class="snooze-list">' + list.map(g =>
+      '<span class="snooze-item">' + esc(g.title) +
+      '<button data-unsnooze="' + g.id + '" aria-label="Un-snooze ' + esc(g.title) + '">bring back</button></span>').join("") +
+    "</div></div></details>";
+}
+
+function viewTonight(){
+  const picked = ui.appetite != null;
+  const chips = k => Object.entries(k === "a" ? APPETITES : MOODS).map(([id, o]) =>
+    '<button class="chip' + ((k === "a" ? ui.appetite : ui.mood) === id ? " on" : "") +
+    '" data-' + (k === "a" ? "app" : "mood") + '="' + id + '">' + o.label +
+    "<small>" + o.hint + "</small></button>").join("");
+
+  let body;
+  if (!picked){
+    body = '<div class="empty glass"><b>Pick an appetite and I\'ll narrow ' + getGames().length +
+           " games down to three.</b>The library isn't the problem. Choosing is.</div>";
+  } else {
+    const list = candidates();
+    body = list.length
+      ? '<div class="picks">' + list.map((c, i) => {
+          const g = c.g, e = c.e;
+          return '<article class="pick glass" style="--h:' + hue(g.id) + '">' +
+            '<div class="rank" aria-hidden="true">' + ["I","II","III"][i] + "</div>" +
+            '<div class="pick-top">' + spine(g) +
+              '<div class="pick-id"><h3>' + esc(g.title) + "</h3>" +
+                '<div class="pick-meta">' + ocBadge(g) +
+                  "<span>" + esc([g.dev, g.year].filter(Boolean).join(" · ")) + "</span></div>" +
+                (g.genres.length ? '<div class="pick-meta"><span>' + esc(g.genres.slice(0,2).join(" · ")) + "</span></div>" : "") +
+              "</div></div>" +
+            '<div class="why">' + c.why.map(w => '<span class="' + (w.hi ? "hi" : "") + '">' + esc(w.t) + "</span>").join("") + "</div>" +
+            '<div class="pick-acts">' +
+              '<button class="btn primary sm" data-start="' + g.id + '">' +
+                '<svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>' +
+                (e.status === "playing" ? "Keep going" : "Start playing") + "</button>" +
+              (weekIds().includes(g.id)
+                ? '<button class="btn ghost sm" disabled>On the list</button>'
+                : '<button class="btn sm" data-week="' + g.id + '">Add to week</button>') +
+              '<button class="btn ghost sm" data-snooze="' + g.id + '">Not tonight</button>' +
+              '<button class="btn ghost sm" data-open="' + g.id + '">Details</button>' +
+            "</div></article>";
+        }).join("") + "</div>"
+      : '<div class="empty glass"><b>Nothing left to suggest.</b>' +
+        (ui.mood === "finish" ? "You have nothing in progress. Start something."
+                              : "Everything is snoozed or finished. Genuinely — go outside.") + "</div>";
+  }
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>What are you playing <em>tonight</em>?</h1>' +
+    '<p class="sub">Answer one question and the library becomes a shortlist. Ranked on how well the game fits the time you actually have, what critics made of it, how long it has been waiting, and what you tend to like.</p></header>' +
+    weekStrip() +
+    '<section class="ask glass"><h2>How much time have you got?</h2>' +
+      '<div class="ask-row">' +
+        '<div class="ask-col"><span class="eyebrow">Tonight</span><div class="chips">' + chips("a") + "</div></div>" +
+        '<div class="ask-col"><span class="eyebrow">Mood — optional</span><div class="chips">' + chips("m") + "</div></div>" +
+      "</div></section>" +
+    body +
+    snoozedStrip() +
+    (picked ? (function(){
+      const W = weights(), n = ratedCount(), maxed = W.taste >= BASE_WEIGHTS.taste + MAX_SHIFT;
+      return '<details class="why-these"><summary>Why these three?</summary><div class="box glass">' +
+        "Each candidate scores on four things, weighted: <b>time fit " + pct(W.fit) + "%</b> — how close its remaining length sits to what you said you had; " +
+        "<b>critical reception " + pct(W.critical) + "%</b> — the OpenCritic score; " +
+        "<b>neglect " + pct(W.neglect) + "%</b> — how long it has sat unplayed, so the shelf rotates instead of showing you the same three forever; " +
+        "and <b>your taste " + pct(W.taste) + "%</b> — the average score you've given games in the same genres. " +
+        "Remaining length uses <em>your</em> chosen intent per game, not the completionist figure. " +
+        "<b>Not tonight</b> hides a game for a week." +
+        '<p style="margin-top:12px">' +
+          (n === 0
+            ? "Those last two shift as you go. Right now nothing is known about your taste, so the critics carry it — score a few games and their share moves to you."
+            : "Because you have scored <b>" + n + (n === 1 ? " game" : " games") + "</b>, " +
+              (W.taste > W.critical
+                ? "your own taste now outweighs the critics" + (maxed ? " and has reached its ceiling" : "") + "."
+                : "some weight has already moved from the critics to you") +
+              " — an aggregate score can't account for what you personally like, so it matters less the more you tell it.") +
+        "</p></div></details>";
+    })() : "") +
+    "</div>";
+}
+
+/* ============================================================
+   5. SHELF
+   ============================================================ */
+const LENGTHS = {all:"Any length", short:"Under 10h", mid:"10 – 25h", long:"25 – 60h", epic:"60h and up"};
+const SORTS   = {added:"Recently added", neglect:"Longest waiting", length:"Shortest first",
+                 oc:"OpenCritic", mine:"My score", title:"A – Z"};
+
+function shelfList(){
+  const q = ui.q.trim().toLowerCase();
+  let list = getGames().map(g => ({g, e:entry(g.id)}));
+
+  if (ui.status !== "all") list = list.filter(x => x.e.status === ui.status);
+  if (ui.length !== "all") list = list.filter(x => bucket(lengthOf(x.g, x.e)) === ui.length);
+  if (q) list = list.filter(x =>
+    (x.g.title + " " + x.g.dev + " " + x.g.genres.join(" ")).toLowerCase().includes(q));
+
+  const by = {
+    added:   (a,b) => b.e.added - a.e.added,
+    neglect: (a,b) => a.e.added - b.e.added,
+    length:  (a,b) => lengthOf(a.g,a.e) - lengthOf(b.g,b.e),
+    oc:      (a,b) => b.g.oc.score - a.g.oc.score,
+    mine:    (a,b) => (b.e.score ?? -1) - (a.e.score ?? -1),
+    title:   (a,b) => a.g.title.localeCompare(b.g.title)
+  };
+  return list.sort(by[ui.sort] || by.added);
+}
+
+function countBy(fn){
+  return getGames().filter(g => fn(g, entry(g.id))).length;
+}
+
+/* Results are built separately from the chrome so typing in the search box
+   can refresh them without tearing out the focused input. */
+function shelfBody(list){
+  if (!list.length) return '<div class="empty glass"><b>Nothing matches.</b>Loosen a filter.</div>';
+
+  if (ui.mode === "grid"){
+    return '<div class="shelf">' + list.map(({g, e}) =>
+      '<button class="card" data-open="' + g.id + '" style="--h:' + hue(g.id) + '">' +
+        spine(g) +                                   /* the title lives on the spine */
+        '<div class="card-m">' + ocBadge(g) +
+          '<span class="num">' + hrs(lengthOf(g, e)) + "</span>" +
+          (e.score != null ? '<span class="num" style="color:var(--purple)">you ' + e.score + "</span>" : "") +
+          '<span class="pill ' + e.status + '">' + STATUSES[e.status] + "</span>" +
+        "</div></button>").join("") + "</div>";
+  }
+
+  return '<div class="tscroll glass"><table class="games"><thead><tr>' +
+    "<th>Game</th><th>Status</th><th>Intent</th>" +
+    '<th class="n" style="text-align:right">Length</th><th class="n" style="text-align:right">Left</th>' +
+    '<th class="n" style="text-align:right">OpenCritic</th><th class="n" style="text-align:right">You</th><th class="n" style="text-align:right">Added</th>' +
+    "</tr></thead><tbody>" + list.map(({g, e}) =>
+      '<tr data-open="' + g.id + '"><td class="tt">' + esc(g.title) +
+        '<div style="font-size:11.5px;color:var(--faint);font-weight:400">' + esc(g.dev) + " · " + g.year + "</div></td>" +
+      '<td><span class="pill ' + e.status + '">' + STATUSES[e.status] + "</span></td>" +
+      '<td style="color:var(--muted);font-size:12.5px">' + INTENTS[e.intent] + "</td>" +
+      '<td class="n">' + hrs(lengthOf(g, e)) + "</td>" +
+      '<td class="n">' + (e.status === "completed" ? "—" : hrs(remaining(g, e))) + "</td>" +
+      '<td class="n">' + ocBadge(g) + "</td>" +
+      '<td class="n" style="color:var(--purple)">' + (e.score != null ? e.score : "—") + "</td>" +
+      '<td class="n">' + whenText(e.added) + "</td></tr>").join("") +
+    "</tbody></table></div>";
+}
+
+function renderShelfResults(){
+  const box = document.getElementById("results");
+  if (!box) return;
+  const list = shelfList();
+  box.innerHTML = shelfBody(list);
+  const c = document.getElementById("count");
+  if (c) c.textContent = list.length + " shown";
+}
+
+function viewShelf(){
+  const list = shelfList();
+
+  const statusOpts = ['<button class="fopt' + (ui.status === "all" ? " on" : "") +
+    '" data-f="status" data-v="all">Everything <i>' + getGames().length + "</i></button>"]
+    .concat(Object.entries(STATUSES).map(([k, label]) =>
+      '<button class="fopt' + (ui.status === k ? " on" : "") + '" data-f="status" data-v="' + k + '">' +
+      label + " <i>" + countBy((g,e) => e.status === k) + "</i></button>")).join("");
+
+  const lengthOpts = Object.entries(LENGTHS).map(([k, label]) =>
+    '<button class="fopt' + (ui.length === k ? " on" : "") + '" data-f="length" data-v="' + k + '">' +
+    label + (k === "all" ? "" : " <i>" + countBy((g,e) => bucket(lengthOf(g,e)) === k) + "</i>") + "</button>").join("");
+
+  const sortOpts = Object.entries(SORTS).map(([k, label]) =>
+    '<button class="fopt' + (ui.sort === k ? " on" : "") + '" data-f="sort" data-v="' + k + '">' + label + "</button>").join("");
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>The <em>Shelf</em></h1>' +
+    '<p class="sub">' + getGames().length + ' games. Length is HowLongToBeat for the intent you set on each one — not the completionist number, unless that is genuinely what you mean to do.</p></header>' +
+    '<div class="shelf-layout">' +
+      '<aside class="filters">' +
+        '<div class="fgroup"><span class="eyebrow">Status</span><div class="fopts">' + statusOpts + "</div></div>" +
+        '<div class="fgroup"><span class="eyebrow">Length</span><div class="fopts">' + lengthOpts + "</div></div>" +
+        '<div class="fgroup"><span class="eyebrow">Sort</span><div class="fopts">' + sortOpts + "</div></div>" +
+      "</aside><div>" +
+        '<div class="shelf-bar">' +
+          '<input class="field" id="q" type="search" placeholder="Search title, studio or genre…" value="' + esc(ui.q) + '" aria-label="Search games">' +
+          '<span class="count num" id="count">' + list.length + " shown</span>" +
+          '<button class="btn sm" data-addgame="1"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add a game</button>' +
+          '<div class="seg" role="group" aria-label="View mode">' +
+            '<button class="' + (ui.mode === "grid" ? "on" : "") + '" data-mode="grid" aria-label="Grid view"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></button>' +
+            '<button class="' + (ui.mode === "table" ? "on" : "") + '" data-mode="table" aria-label="Table view"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>' +
+          "</div></div>" +
+        '<div id="results">' + shelfBody(list) + "</div>" +
+      "</div></div></div>";
+}
+
+/* ============================================================
+   5b. DATA IN AND OUT
+   Everything lives in one browser, so getting a copy out matters more
+   here than it would with a server behind it.
+   ============================================================ */
+function toCSV(){
+  const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const iso = ts => ts ? new Date(ts).toISOString().slice(0, 10) : "";
+  const head = ["Title","Developer","Year","Status","Intent","Hours played","Length (h)",
+                "Remaining (h)","OpenCritic","Your score","Paid","Added","Finished"];
+  const rows = getGames().map(g => {
+    const e = entry(g.id);
+    return [g.title, g.dev, g.year, STATUSES[e.status], INTENTS[e.intent], e.hours,
+            hasLength(g) ? lengthOf(g, e) : "", hasLength(g) ? remaining(g, e) : "",
+            g.oc && g.oc.score != null ? g.oc.score : "",
+            e.score, e.price, iso(e.added), iso(e.finished)].map(q).join(",");
+  });
+  return [head.map(q).join(",")].concat(rows).join("\n");
+}
+
+/* Blob downloads can be blocked in a sandboxed frame; the caller falls back
+   to showing the text when this returns false. */
+function download(name, text, type){
+  try{
+    const url = URL.createObjectURL(new Blob([text], {type}));
+    const a = document.createElement("a");
+    a.href = url; a.download = name; a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return true;
+  } catch(err){ return false; }
+}
+
+function exportData(kind){
+  const stamp = new Date().toISOString().slice(0, 10);
+  const ok = kind === "csv"
+    ? download("backlogged-" + stamp + ".csv", toCSV(), "text/csv")
+    : download("backlogged-" + stamp + ".json", JSON.stringify(state, null, 2), "application/json");
+  if (ok) return toast(kind === "csv" ? "CSV downloaded." : "JSON downloaded.");
+  ui.showData = true; render();
+  toast("Download blocked here — copy the text instead.");
+}
+
+function importData(text){
+  let p;
+  try{ p = JSON.parse(text); }
+  catch(err){ return toast("That file isn't valid JSON."); }
+  if (!p || typeof p !== "object" || !p.entries)
+    return toast("That doesn't look like a Backlogged export.");
+  if (!confirm("Replace everything in this browser with the contents of that file?")) return;
+  state = migrate(p);
+  save();
+  toast("Imported.");
+  render();
+}
+
+const SYNC_WORDS = {
+  off:      "",
+  local:    "On this device",
+  syncing:  "Syncing…",
+  synced:   "Synced",
+  offline:  "Offline — will sync",
+  error:    "Sync failed — retrying"
+};
+function paintSync(){
+  const el = document.getElementById("syncDot");
+  if (!el) return;
+  el.className = "sync " + syncStatus;
+  el.textContent = SYNC_WORDS[syncStatus] || "";
+  // Only means anything to someone with an account. A signed-out visitor
+  // reading a public profile doesn't need to be told where data lives.
+  el.hidden = syncStatus === "off" || !signedIn();
+}
+
+/* Sign-in, account and public-profile controls. Absent entirely when the
+   backend is unconfigured, so the app is unchanged without it. */
+function accountPanel(){
+  if (!cloudOn()){
+    return '<section class="panel glass"><span class="eyebrow">Accounts</span>' +
+      '<p class="pnote">Not switched on. Add a Supabase URL and anon key at the top of this file to enable ' +
+      'sign-in, cross-device sync and public profiles. Everything works without it — the data just stays in this browser.</p>' +
+      "</section>";
+  }
+
+  if (!signedIn()){
+    return '<section class="panel glass"><span class="eyebrow">Sign in — optional</span>' +
+      '<p class="pnote">Signing in syncs your library across devices and keeps it if this browser is cleared. ' +
+      'Whatever you already have here comes with you.</p>' +
+      '<div class="signin">' +
+        '<input class="field" id="emailIn" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email address">' +
+        '<button class="btn primary sm" data-magic="1">Email me a link</button>' +
+      "</div>" +
+      '<div class="data-acts" style="margin-top:12px">' +
+        '<button class="btn sm" data-oauth="github">Continue with GitHub</button>' +
+        '<button class="btn sm" data-oauth="google">Continue with Google</button>' +
+      "</div>" +
+      '<p class="pnote" style="margin-top:14px">No password to forget, and none for us to store.</p>' +
+    "</section>";
+  }
+
+  const p = profile || {};
+  const shared = getGames().filter(g => entry(g.id).shared).length;
+  return '<section class="panel glass"><span class="eyebrow">Account</span>' +
+    '<p class="pnote">Signed in as <b>' + esc(session.user && session.user.email || "you") + "</b>. " +
+      "Your library syncs automatically.</p>" +
+
+    '<div class="fsec"><span class="eyebrow">Public profile</span>' +
+      '<p class="fnote">Off unless you turn it on. Only games you tick as shared ever appear, and journal notes, ' +
+      'prices and drop reasons are never published — the server strips them, not the browser.</p>' +
+      '<div class="fgrid">' +
+        '<label class="fld"><span>Handle <i>a–z, 0–9, - and _</i></span>' +
+          '<input class="field" id="handleIn" value="' + esc(p.handle || "") + '" placeholder="yourname"></label>' +
+        '<label class="fld"><span>Display name</span>' +
+          '<input class="field" id="nameIn" value="' + esc(p.display_name || "") + '" placeholder="Optional"></label>' +
+      "</div>" +
+      '<label class="fld" style="margin-top:14px"><span>Bio</span>' +
+        '<input class="field" id="bioIn" value="' + esc(p.bio || "") + '" placeholder="Optional, 400 characters"></label>' +
+      '<label class="tick" style="margin-top:14px"><input type="checkbox" id="shareYearIn"' +
+        (p.share_year ? " checked" : "") + "> Also show this year's totals — how many games you finished and hours logged" +
+        "</label>" +
+      '<div class="data-acts">' +
+        '<button class="btn sm" data-saveprofile="1">Save profile</button>' +
+        (p.is_public
+          ? '<button class="btn sm" data-publish="1">Republish (' + shared + " shared)</button>" +
+            '<button class="btn ghost sm" data-unpublish="1">Make private</button>' +
+            (p.handle ? '<a class="btn ghost sm" href="#/u/' + encodeURIComponent(p.handle) + '">View it</a>' : "")
+          : '<button class="btn primary sm" data-publish="1">Make my shelf public</button>') +
+      "</div>" +
+      (p.is_public && p.handle
+        ? '<p class="pnote" style="margin-top:12px">Live at <code>#/u/' + esc(p.handle) + "</code> · " +
+          shared + (shared === 1 ? " game shared" : " games shared") + ". Tick games to share on their own page.</p>"
+        : "") +
+    "</div>" +
+
+    '<div class="data-acts" style="margin-top:20px">' +
+      '<button class="btn ghost sm" data-signout="1">Sign out</button>' +
+    "</div>" +
+  "</section>";
+}
+
+function dataPanel(){
+  return '<section class="panel glass"><span class="eyebrow">Your data</span>' +
+    '<p style="font-size:13.5px;color:var(--muted);line-height:1.6">It lives in this browser and nowhere else — no account, no server. Take a copy before you clear your history.</p>' +
+    '<div class="data-acts">' +
+      '<button class="btn sm" data-export="json">Download JSON</button>' +
+      '<button class="btn sm" data-export="csv">Download CSV</button>' +
+      '<button class="btn ghost sm" data-import="1">Import JSON…</button>' +
+      '<button class="btn ghost sm" data-showjson="1">' + (ui.showData ? "Hide text" : "Show as text") + "</button>" +
+      '<input type="file" id="importFile" accept="application/json,.json" hidden>' +
+    "</div>" +
+    (ui.showData
+      ? '<textarea class="field" id="jsonOut" rows="6" readonly onclick="this.select()">' +
+        esc(JSON.stringify(state)) + "</textarea>"
+      : "") +
+  "</section>";
+}
+
+/* ============================================================
+   6. YOUR LIBRARY
+   Same numbers as before; what changed is which one is 86px tall. Hours
+   played leads, hours remaining is available but no longer accusatory.
+   ============================================================ */
+function viewStats(){
+  const games = getGames();
+  const totals = {backlog:0, playing:0, completed:0, dropped:0};
+  let ahead = 0, rated = [], played = 0, spentPlayed = 0, bestValue = null;
+
+  for (const g of games){
+    const e = entry(g.id);
+    const len = lengthOf(g, e);
+    if (e.status === "completed" || e.status === "dropped") totals[e.status] += e.hours || len;
+    else { totals[e.status] += len; ahead += remaining(g, e); }
+    if (e.score != null) rated.push({g, e});
+    played += e.hours;
+    if (e.price != null && e.hours > 0){
+      spentPlayed += e.price;
+      const per = e.price / e.hours;
+      if (!bestValue || per < bestValue.per) bestValue = {g, e, per};
+    }
+  }
+
+  const weekly = state.prefs.weekly || 8;
+  const months = ahead / (weekly * 4.345);
+  const monthsTxt = months >= 12 ? (months / 12).toFixed(1) + " years" : months.toFixed(1) + " months";
+  const done = games.filter(g => entry(g.id).status === "completed").length;
+  const playing = games.filter(g => entry(g.id).status === "playing").length;
+  const dropped = games.filter(g => entry(g.id).status === "dropped").length;
+  const sumAll = Object.values(totals).reduce((a,b) => a + b, 0) || 1;
+
+  const COLORS = {backlog:"var(--faint)", playing:"var(--sky)", completed:"var(--mighty)", dropped:"var(--weak)"};
+  const bar = Object.entries(totals).map(([k, v]) =>
+    '<div style="width:' + (v / sumAll * 100) + '%;background:' + COLORS[k] + '"></div>').join("");
+  const legend = Object.entries(totals).map(([k, v]) =>
+    '<div><i style="background:' + COLORS[k] + '"></i>' + STATUSES[k] + "<b>" + Math.round(v) + "h</b></div>").join("");
+
+  /* longest on the shelf — backlog games, never started */
+  const waiting = games.map(g => ({g, e:entry(g.id)}))
+    .filter(x => x.e.status === "backlog" && !x.e.hours)
+    .sort((a,b) => a.e.added - b.e.added).slice(0, 6);
+  const maxWait = waiting.length ? days(waiting[0].e.added) : 1;
+
+  /* taste — your score against theirs */
+  const W = 340, H = 250, P = 42;
+  const px = v => P + (v - 5) / 5 * (W - P - 16);
+  const py = v => H - P - (v - 5) / 5 * (H - P - 18);
+  const plotted = rated.filter(({g}) => g.oc && g.oc.score != null);
+  const dots = plotted.map(({g, e}) =>
+    '<circle cx="' + px(g.oc.score/10).toFixed(1) + '" cy="' + py(e.score).toFixed(1) +
+    '" r="6" fill="hsl(' + hue(g.id) + ' 65% 58%)" fill-opacity=".85" stroke="rgba(255,255,255,.35)" data-open="' + g.id + '"><title>' +
+    esc(g.title) + " — you " + e.score + ", critics " + (g.oc.score/10).toFixed(1) + "</title></circle>").join("");
+  const gridlines = [6,7,8,9,10].map(v =>
+    '<line class="gr" x1="' + px(v) + '" y1="' + (H-P) + '" x2="' + px(v) + '" y2="16"/>' +
+    '<line class="gr" x1="' + P + '" y1="' + py(v) + '" x2="' + (W-16) + '" y2="' + py(v) + '"/>').join("");
+  const ticks = [6,7,8,9,10].map(v =>
+    '<text x="' + px(v) + '" y="' + (H-P+16) + '" text-anchor="middle">' + v + "</text>" +
+    '<text x="' + (P-10) + '" y="' + (py(v)+3.5) + '" text-anchor="end">' + v + "</text>").join("");
+
+  /* genre affinity */
+  const aff = affinity();
+  const affRows = Object.entries(aff).sort((a,b) => b[1] - a[1]).slice(0, 6).map(([k, v]) =>
+    '<div class="row"><span class="rn">' + esc(k) + '</span>' +
+    '<span class="meter"><i style="width:' + (v/10*100) + '%;background:linear-gradient(90deg,var(--indigo),var(--purple))"></i></span>' +
+    '<span class="rv">' + v.toFixed(1) + "</span></div>").join("");
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>Your <em>library</em></h1>' +
+    '<p class="sub">A library, not a to-do list. Here is what it has actually given you — and, if you ever want it, what is still ahead.</p></header>' +
+    '<div class="stat-grid">' +
+
+      '<section class="panel glass lead"><span class="eyebrow">Hours played</span>' +
+        '<div class="lead-n">' + Math.round(played) + "<small>hours, and counting</small></div>" +
+        '<p class="lead-say">Across <b>' + done + (done === 1 ? " game" : " games") + " finished</b>" +
+          (playing ? " and " + playing + " in progress" : "") +
+          (dropped ? ", plus " + dropped + " you decided against" : "") + ". " +
+          "That is time spent, not time owed.</p>" +
+        '<p class="ahead">Still ahead if you wanted every one of them: <b>' + Math.round(ahead) + " hours</b>" +
+          " — about " + monthsTxt + " at " + weekly + "h a week. " +
+          "Switch a game from Completionist to Main and that drops immediately; the number describes how you mean to play, not what you owe.</p>" +
+        '<div class="rate"><label for="weekly">I realistically play</label>' +
+          '<input class="field num" id="weekly" type="number" min="1" max="80" value="' + weekly + '"> hours a week</div>' +
+      "</section>" +
+
+      '<section class="panel glass"><span class="eyebrow">Where the hours sit</span>' +
+        '<div class="bar">' + bar + '</div><div class="legend">' + legend + "</div></section>" +
+
+      '<section class="panel glass"><span class="eyebrow">Follow-through</span>' +
+        '<div class="rows">' +
+          '<div class="row"><span class="rn">Finished</span><span class="meter"><i style="width:' + (done/games.length*100) + '%;background:var(--mighty)"></i></span><span class="rv">' + done + " of " + games.length + "</span></div>" +
+          '<div class="row"><span class="rn">Put down</span><span class="meter"><i style="width:' + (dropped/games.length*100) + '%;background:var(--weak)"></i></span><span class="rv">' + dropped + "</span></div>" +
+          '<div class="row"><span class="rn">Not started yet</span><span class="meter"><i style="width:' + (countBy((g,e)=>!e.hours)/games.length*100) + '%;background:var(--faint)"></i></span><span class="rv">' + countBy((g,e) => !e.hours) + "</span></div>" +
+        "</div>" +
+        '<p style="font-size:12.5px;color:var(--faint);margin-top:16px;line-height:1.6">A drop rate of zero is not discipline. It means you are finishing things you stopped enjoying.</p>' +
+      "</section>" +
+
+      '<section class="panel glass taste"><span class="eyebrow">You vs. the critics</span>' +
+        (rated.length
+          ? '<svg class="scatter" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Your score plotted against OpenCritic score">' +
+            gridlines +
+            '<line class="agree" x1="' + px(5) + '" y1="' + py(5) + '" x2="' + px(10) + '" y2="' + py(10) + '"/>' +
+            '<line class="ax" x1="' + P + '" y1="' + (H-P) + '" x2="' + (W-12) + '" y2="' + (H-P) + '"/>' +
+            '<line class="ax" x1="' + P + '" y1="' + (H-P) + '" x2="' + P + '" y2="12"/>' +
+            ticks + dots +
+            '<text class="lbl" x="' + ((W+P)/2) + '" y="' + (H-8) + '" text-anchor="middle">OpenCritic score</text>' +
+            '<text class="lbl" x="-' + ((H-P)/2+8) + '" y="13" text-anchor="middle" transform="rotate(-90)">Your score</text>' +
+            "</svg>" +
+            '<p style="font-size:12.5px;color:var(--faint);margin-top:10px;line-height:1.6">Dashed line is agreement. Above it you liked it more than they did; below, less. ' + plotted.length + " rated so far.</p>"
+          : '<p style="color:var(--faint);font-size:13.5px">Rate a few finished games and your taste starts showing up here.</p>') +
+      "</section>" +
+
+      '<section class="panel glass"><span class="eyebrow">Longest on the shelf</span>' +
+        (waiting.length ? '<div class="rows">' + waiting.map(({g, e}) =>
+          '<button class="row" data-open="' + g.id + '"><span class="rn">' + esc(g.title) + "</span>" +
+          '<span class="meter"><i style="width:' + (days(e.added)/maxWait*100) + '%;background:linear-gradient(90deg,var(--faint),var(--pink))"></i></span>' +
+          '<span class="rv">' + days(e.added) + "d</span></button>").join("") + "</div>" +
+          '<p style="font-size:12.5px;color:var(--faint);margin-top:16px;line-height:1.6">Waiting is not wasting. These are just the ones the Tonight shortlist will nudge forward.</p>'
+          : '<p style="color:var(--faint);font-size:13.5px">You have started everything you own. Remarkable.</p>') +
+      "</section>" +
+
+      '<section class="panel glass"><span class="eyebrow">What you actually like</span>' +
+        (affRows ? '<div class="rows">' + affRows + "</div>" +
+          '<p style="font-size:12.5px;color:var(--faint);margin-top:16px;line-height:1.6">Averaged from your own scores. This is what nudges the Tonight shortlist.</p>'
+          : '<p style="color:var(--faint);font-size:13.5px">Score a few games and your genres sort themselves out.</p>') +
+      "</section>" +
+
+      /* Money only ever appears against hours actually played. Totalling spend
+         on unplayed games is the exact guilt vector this app is avoiding. */
+      '<section class="panel glass"><span class="eyebrow">What it worked out at</span>' +
+        (spentPlayed > 0 && played > 0
+          ? '<div class="lead-n" style="font-size:clamp(38px,6vw,58px)">' + money(spentPlayed / played) +
+              "<small>an hour</small></div>" +
+            '<p class="lead-say" style="font-size:13.5px">' + money(spentPlayed) + " on games you have actually played, over " +
+              Math.round(played) + " hours." +
+              (bestValue ? " Best of the lot: <b>" + esc(bestValue.g.title) + "</b> at " + money(bestValue.per) + " an hour." : "") +
+            "</p>" +
+            '<p style="font-size:12.5px;color:var(--faint);margin-top:14px;line-height:1.6">Only counts what you have played. Unplayed games deliberately have no price attached to them here.</p>'
+          : '<p style="color:var(--faint);font-size:13.5px">Add what you paid on a game\'s page and this works out your cost per hour. It is usually a nicer number than you expect.</p>') +
+      "</section>" +
+
+      accountPanel() +
+      dataPanel() +
+
+    "</div></div>";
+}
+
+/* ============================================================
+   7. GAME DETAIL
+   ============================================================ */
+function detailHTML(id){
+  const g = game(id); if (!g) return "";
+  const e = entry(id);
+  const known = hasLength(g);
+  const overridden = e.hltbOverride != null;
+  const range = overridden ? null : lengthRange(g);
+  const len = lengthOf(g, e);
+  const done = (known || overridden) && len ? Math.min(100, Math.round(e.hours / len * 100)) : 0;
+
+  // only offer the intents this game actually has figures for
+  const intents = knownIntents(g).map(k =>
+    '<button class="intent' + (e.intent === k ? " on" : "") + '" data-intent="' + k + '">' +
+    "<b>" + hrs(g.hltb[k]) + "</b><span>" + INTENTS[k].toUpperCase() + "</span></button>").join("");
+
+  const statusBtns = Object.entries(STATUSES).map(([k, label]) =>
+    '<button class="chip' + (e.status === k ? " on" : "") + '" data-status="' + k + '">' + label + "</button>").join("");
+
+  const notes = e.notes.length
+    ? e.notes.slice().sort((a,b) => b.at - a.at).map((n, i) =>
+        '<div class="note-item"><div class="note-when">' + dateText(n.at) + "</div>" +
+        '<div class="note-body">' + esc(n.text) + "</div>" +
+        '<button class="note-del" data-delnote="' + n.at + '" aria-label="Delete note">remove</button></div>').join("")
+    : '<p style="color:var(--faint);font-size:13.5px;font-style:italic;font-family:var(--serif)">No entries yet. Notes are for during — the half-thought you want back later.</p>';
+
+  let tabBody;
+  if (ui.tab === "journal"){
+    tabBody =
+      '<div class="prog"><div class="prog-top"><span>' +
+        ((known || overridden) ? "Progress against " + (overridden ? "your estimate" : INTENTS[e.intent].toLowerCase()) : "Hours played") + "</span>" +
+        "<b>" + ((known || overridden) ? hrs(e.hours) + " of ~" + hrs(len) + " · " + done + "%" : hrs(e.hours)) + "</b></div>" +
+        ((known || overridden) ? '<div class="prog-track"><div class="prog-fill" style="width:' + done + '%"></div></div>' : "") +
+        '<div class="logrow"><label for="loghrs">Log</label><input class="field num" id="loghrs" type="number" min="0" step="0.5" placeholder="2"> hours played' +
+          '<button class="btn sm" data-log="1">Add</button>' +
+          (e.hours ? '<button class="btn ghost sm" data-resethrs="1">Reset</button>' : "") +
+        "</div></div>" +
+      '<textarea class="field" id="noteInput" rows="3" placeholder="What happened this session?"></textarea>' +
+      '<div class="rev-acts"><button class="btn primary sm" data-addnote="1">Add entry</button></div>' +
+      '<div class="notes">' + notes + "</div>";
+  } else if (ui.tab === "review"){
+    tabBody = ui.editingReview
+      ? '<textarea class="field" id="reviewInput" rows="14" placeholder="Take your time. Blank line between paragraphs.">' + esc(e.review) + "</textarea>" +
+        '<div class="rev-acts"><button class="btn primary sm" data-savereview="1">Save review</button>' +
+        '<button class="btn ghost sm" data-cancelreview="1">Cancel</button></div>'
+      : (e.review
+          ? '<div class="review-read">' + e.review.split(/\n\s*\n/).map(p => "<p>" + esc(p) + "</p>").join("") + "</div>" +
+            '<div class="rev-acts"><button class="btn sm" data-editreview="1">Edit</button></div>'
+          : '<p class="review-empty">Nothing written yet. When you have finished it and had a day to sit with it, this is where it goes.</p>' +
+            '<div class="rev-acts"><button class="btn primary sm" data-editreview="1">Write a review</button></div>');
+  } else {
+    const items = e.history.slice().sort((a,b) => b.at - a.at);
+    tabBody = items.length
+      ? '<div class="hist">' + items.map(h =>
+          '<div class="hist-item"><span class="hist-dot ' + h.status + '"></span>' +
+          '<div class="hist-txt">' + (h.status === "backlog" ? "Added to the shelf" :
+             h.status === "playing" ? "Started playing" :
+             h.status === "completed" ? "Finished" : "Put down") +
+            (h.note ? "<em>" + esc(h.note) + "</em>" : "") + "</div>" +
+          '<span class="hist-when">' + dateText(h.at) + "</span></div>").join("") + "</div>"
+      : '<p style="color:var(--faint);font-size:13.5px">Nothing recorded yet.</p>';
+  }
+
+  const a = affinityFor(g, affinity());
+
+  return '<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(g.title) + '">' +
+    '<div class="sheet-hero" style="--h:' + hue(g.id) + '">' +
+      '<button class="x" data-close="1" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>' +
+      '<div class="hero-in">' + spine(g) +
+        '<div class="hero-id"><h2>' + esc(g.title) + "</h2>" +
+          '<p class="hero-sub">' +
+            esc([g.dev, g.pub && g.pub !== g.dev ? "published by " + g.pub : "", g.year].filter(Boolean).join(" · ")) +
+            (isCustom(g.id) ? ' · <button class="linkbtn" data-editgame="' + g.id + '">edit</button>' : "") + "</p>" +
+          (g.genres.length + g.platforms.length
+            ? '<div class="hero-tags">' + g.genres.concat(g.platforms).map(t => '<span class="tag">' + esc(t) + "</span>").join("") + "</div>"
+            : "") +
+        "</div></div></div>" +
+
+    '<div class="trip">' +
+      '<div><span class="eyebrow">How long — ' + (overridden ? "your estimate" : "HowLongToBeat") + "</span>" +
+        (known || overridden
+          ? '<div class="big">' + hrs(len).replace("h", "") +
+              "<small>hours, " + (overridden ? "your figure" : INTENTS[e.intent].toLowerCase()) + "</small></div>" +
+            (range
+              ? '<p class="spread">Reported anywhere from <b>' + hrs(range.lo) + "</b> to <b>" + hrs(range.hi) +
+                "</b> depending how you play it.</p>"
+              : "") +
+            (overridden ? "" : '<div class="intents">' + intents + "</div>") +
+            '<div class="logrow" style="margin-top:12px">' +
+              '<label for="ownEst">' + (overridden ? "Your estimate" : "Use my own") + "</label>" +
+              '<input class="field num" id="ownEst" type="number" min="0" step="0.5" placeholder="hours" value="' +
+                (e.hltbOverride ?? "") + '">' +
+              (overridden ? '<button class="btn ghost sm" data-clearest="1">Use HowLongToBeat</button>' : "") +
+            "</div>" +
+            '<p class="note">' + (overridden
+              ? "Your figure is driving every length in the app for this game."
+              : "Pick what you actually intend to do. Every length figure follows this one — and these estimates are crowd-sourced, so treat them as a guide.") + "</p>"
+          : '<div class="big" style="color:var(--faint)"><span style="font-size:19px;font-family:var(--sans);font-weight:400">No length recorded</span></div>' +
+            '<div class="logrow" style="margin-top:12px"><label for="ownEst">Your estimate</label>' +
+              '<input class="field num" id="ownEst" type="number" min="0" step="0.5" placeholder="hours"></label></div>' +
+            '<p class="note">' + (isCustom(g.id) ? "Add hours here or in edit, and the intent picker appears."
+                                                 : "No HowLongToBeat figures for this one — put in your own and the app will use it.") + "</p>") +
+      "</div>" +
+
+      '<div><span class="eyebrow">What they thought — OpenCritic</span>' +
+        (g.oc && g.oc.score != null
+          ? '<div class="oc-tier"><div class="big" style="color:var(--' + tier(g.oc.score) + ')">' + g.oc.score + "</div>" +
+            '<div><div class="tierword" style="color:var(--' + tier(g.oc.score) + ')">' + tierWord(g.oc.score) + "</div>" +
+            (g.oc.recommend != null ? '<div style="font-size:12px;color:var(--faint)">' + g.oc.recommend + "% recommend</div>" : "") +
+            "</div></div>" +
+            '<div class="quotes">' + g.quotes.map(([q, who]) =>
+              '<div class="quote"><q>' + esc(q) + "</q><cite>" + esc(who) + "</cite></div>").join("") + "</div>"
+          : '<div class="big" style="color:var(--faint)"><span style="font-size:19px;font-family:var(--sans);font-weight:400">No critic score</span></div>' +
+            '<p class="note">Which mostly means yours is the only one that counts.</p>') +
+      "</div>" +
+
+      '<div><span class="eyebrow">What you thought</span>' +
+        '<div class="big" style="color:' + (e.score != null ? "var(--purple)" : "var(--faint)") + '" id="scoreOut">' +
+          (e.score != null ? e.score + "<small>out of 10</small>"
+                           : '<span style="font-size:19px;font-family:var(--sans);font-weight:400">Not rated yet</span>') + "</div>" +
+        '<input class="slider" id="score" type="range" min="0" max="10" step="0.5" value="' + (e.score ?? 0) + '" aria-label="Your score out of 10">' +
+        '<p class="note">' +
+          (e.score != null
+            ? (g.oc && g.oc.score != null
+                ? (function(){
+                    const d = e.score - g.oc.score/10;
+                    return Math.abs(d) < .5 ? "You and the critics agree, near enough."
+                         : d > 0 ? "You rate it " + d.toFixed(1) + " higher than they did."
+                                 : "You rate it " + Math.abs(d).toFixed(1) + " lower than they did.";
+                  })()
+                : "Your score, with nobody to argue with.")
+            : "Drag to score. Same 0–10 axis as OpenCritic, so the gap is the interesting bit.") +
+          (a != null && g.genres.length ? "<br>Your average for " + esc(g.genres[0]) + ": " + a.toFixed(1) + "." : "") +
+        "</p></div></div>" +
+
+    '<div class="statusbar"><span class="eyebrow">Status</span>' + statusBtns +
+      '<span class="paid"><label for="paidIn">Paid</label>' +
+        '<span class="cur">' + esc(state.prefs.currency || "£") + "</span>" +
+        '<input class="field num" id="paidIn" type="number" min="0" step="0.01" placeholder="—" value="' + (e.price ?? "") + '">' +
+        // value earned, never money-against-unplayed
+        (e.price != null && e.hours > 0
+          ? '<em>' + money(e.price / e.hours) + " an hour so far</em>"
+          : "") +
+      "</span>" +
+      (e.status === "dropped" && e.reason
+        ? '<span style="font-size:12.5px;color:var(--muted);font-style:italic;flex-basis:100%;margin-top:6px">“' + esc(e.reason) + "”</span>"
+        : "") +
+    "</div>" +
+
+    // only meaningful once there's a public profile to put it on
+    (signedIn() && profile && profile.is_public
+      ? '<div class="statusbar sharebar"><span class="eyebrow">On my public shelf</span>' +
+          '<label class="tick"><input type="checkbox" id="shareIn"' + (e.shared ? " checked" : "") +
+            "> Show this game</label>" +
+          (e.review
+            ? '<label class="tick"><input type="checkbox" id="shareRevIn"' + (e.shareReview ? " checked" : "") +
+              (e.shared ? "" : " disabled") + "> Include my review</label>"
+            : '<span class="pnote" style="margin:0">Write a review and you can share that too.</span>') +
+          '<span class="pnote" style="margin:0 0 0 auto">Notes, price and drop reasons stay private.</span>' +
+        "</div>"
+      : "") +
+
+    '<div class="tabs" role="tablist">' +
+      '<button class="tab' + (ui.tab === "journal" ? " on" : "") + '" data-tab="journal">Journal<i>' + e.notes.length + "</i></button>" +
+      '<button class="tab' + (ui.tab === "review" ? " on" : "") + '" data-tab="review">Review' + (e.review ? "<i>●</i>" : "") + "</button>" +
+      '<button class="tab' + (ui.tab === "history" ? " on" : "") + '" data-tab="history">History<i>' + e.history.length + "</i></button>" +
+    '</div><div class="tabbody">' + tabBody + "</div>" +
+
+    "</div></div>";
+}
+
+/* ============================================================
+   6c. THE YEAR
+   Most gamers can recall fewer than half the games they played in a year.
+   This is the panel that answers "what did I actually do?" — but only from
+   data that carries a real date. Hours logged before sessions existed have
+   none, and are reported as unknown rather than guessed at.
+   ============================================================ */
+const yearOf = ts => new Date(ts).getFullYear();
+
+function yearSummary(y){
+  const games = getGames();
+  let sessionHours = 0, sessionCount = 0, notes = 0, reviews = 0, spent = 0;
+  const finished = [], started = [], scored = [], journalled = [];
+  let undatedHours = 0;
+
+  for (const g of games){
+    const e = entry(g.id);
+
+    let mine = 0;
+    for (const s of (e.sessions || [])) if (yearOf(s.at) === y){ mine += s.hours; sessionCount++; }
+    sessionHours += mine;
+    // hours on the books with no session behind them predate this feature
+    const accounted = (e.sessions || []).reduce((n, s) => n + s.hours, 0);
+    undatedHours += Math.max(0, (e.hours || 0) - accounted);
+
+    for (const n of (e.notes || [])) if (yearOf(n.at) === y) notes++;
+    const jThisYear = (e.notes || []).filter(n => yearOf(n.at) === y).length;
+    if (jThisYear) journalled.push({g, e, n:jThisYear});
+
+    for (const h of (e.history || [])){
+      if (yearOf(h.at) !== y) continue;
+      if (h.status === "completed") finished.push({g, e, at:h.at});
+      if (h.status === "playing")   started.push({g, e, at:h.at});
+    }
+    if (e.finished && yearOf(e.finished) === y){
+      if (e.review) reviews++;
+      if (e.score != null) scored.push({g, e});
+      if (e.price != null) spent += e.price;
+    }
+  }
+
+  finished.sort((a, b) => a.at - b.at);
+  scored.sort((a, b) => b.e.score - a.e.score);
+  journalled.sort((a, b) => b.n - a.n);
+
+  const longest = finished.slice().sort((a, b) => lengthOf(b.g, b.e) - lengthOf(a.g, a.e))[0];
+  const surprise = scored
+    .filter(x => x.g.oc && x.g.oc.score != null)
+    .map(x => ({...x, gap: x.e.score - x.g.oc.score / 10}))
+    .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))[0];
+
+  return {y, sessionHours, sessionCount, undatedHours, notes, reviews, spent,
+          finished, started, scored, journalled, longest, surprise};
+}
+
+function yearsWithData(){
+  const set = new Set([new Date().getFullYear()]);
+  for (const g of getGames()){
+    const e = entry(g.id);
+    for (const h of (e.history || [])) set.add(yearOf(h.at));
+    for (const s of (e.sessions || [])) set.add(yearOf(s.at));
+  }
+  return [...set].sort((a, b) => b - a);
+}
+
+function viewYear(y){
+  const s = yearSummary(y);
+  const years = yearsWithData();
+  const nothing = !s.finished.length && !s.sessionHours && !s.notes && !s.started.length;
+
+  const card = (eyebrow, body) =>
+    '<section class="panel glass"><span class="eyebrow">' + eyebrow + "</span>" + body + "</section>";
+
+  const gameLine = (x, right) =>
+    '<button class="row" data-open="' + x.g.id + '"><span class="rn">' + esc(x.g.title) + "</span>" +
+    '<span class="rv">' + right + "</span></button>";
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>' + y + ' in <em>play</em></h1>' +
+    '<p class="sub">' + (nothing
+      ? "Nothing recorded for this year yet."
+      : "What you actually played, from what carries a date.") + "</p>" +
+    '<div class="chips" style="margin-top:16px">' + years.map(yy =>
+      '<button class="chip' + (yy === y ? " on" : "") + '" data-year="' + yy + '">' + yy + "</button>").join("") +
+    "</div></header>" +
+
+    '<div class="stat-grid">' +
+      '<section class="panel glass lead"><span class="eyebrow">Games finished</span>' +
+        '<div class="lead-n">' + s.finished.length +
+          "<small>" + (s.finished.length === 1 ? "game seen through" : "games seen through") + "</small></div>" +
+        (s.finished.length
+          ? '<p class="lead-say">Started with <b>' + esc(s.finished[0].g.title) + "</b>" +
+            (s.finished.length > 1 ? ", most recently <b>" + esc(s.finished[s.finished.length-1].g.title) + "</b>" : "") + ".</p>"
+          : '<p class="lead-say">Nothing finished this year — which is a fact, not a verdict.</p>') +
+        (s.sessionHours
+          ? '<p class="ahead"><b>' + hrs(s.sessionHours) + "</b> logged across " + s.sessionCount +
+            (s.sessionCount === 1 ? " session" : " sessions") + "." +
+            (s.undatedHours ? " A further " + hrs(s.undatedHours) + " sits on your shelf without a date — " +
+              "logged before sessions were recorded, so it can't be attributed to a year." : "") + "</p>"
+          : '<p class="ahead">No dated hours yet. Hours logged from now on are stamped, so next year this fills in.' +
+            (s.undatedHours ? " (" + hrs(s.undatedHours) + " is on the books but undated.)" : "") + "</p>") +
+      "</section>" +
+
+      card("Finished", s.finished.length
+        ? '<div class="rows">' + s.finished.slice().reverse().slice(0, 8).map(x =>
+            gameLine(x, dateText(x.at))).join("") + "</div>"
+        : '<p class="pnote">Nothing yet.</p>') +
+
+      card("Best of the year", s.scored.length
+        ? '<div class="rows">' + s.scored.slice(0, 5).map(x =>
+            gameLine(x, x.e.score + "/10")).join("") + "</div>"
+        : '<p class="pnote">Score a game you finished and it shows up here.</p>') +
+
+      card("Biggest disagreement", s.surprise
+        ? '<div class="rows">' + gameLine(s.surprise,
+            (s.surprise.gap > 0 ? "+" : "") + s.surprise.gap.toFixed(1)) + "</div>" +
+          '<p class="pnote">You rated <b>' + esc(s.surprise.g.title) + "</b> " +
+            Math.abs(s.surprise.gap).toFixed(1) + " " + (s.surprise.gap > 0 ? "higher" : "lower") +
+            " than the critics did.</p>"
+        : '<p class="pnote">Needs a finished game with both your score and a critic score.</p>') +
+
+      card("Longest haul", s.longest
+        ? '<div class="rows">' + gameLine(s.longest, hrs(lengthOf(s.longest.g, s.longest.e))) + "</div>" +
+          '<p class="pnote">The biggest thing you saw through this year.</p>'
+        : '<p class="pnote">Nothing finished yet.</p>') +
+
+      card("Written down", '<div class="rows">' +
+        '<div class="row"><span class="rn">Journal entries</span><span class="rv">' + s.notes + "</span></div>" +
+        '<div class="row"><span class="rn">Reviews</span><span class="rv">' + s.reviews + "</span></div>" +
+        '<div class="row"><span class="rn">Games started</span><span class="rv">' + s.started.length + "</span></div>" +
+        "</div>" +
+        (s.journalled.length
+          ? '<p class="pnote">Most journalled: <b>' + esc(s.journalled[0].g.title) + "</b>.</p>" : "")) +
+
+    "</div></div>";
+}
+
+/* ============================================================
+   6b. A PUBLIC SHELF — the one route that works signed out
+   Content here is written by other people, so everything goes through
+   esc() and nothing is trusted.
+   ============================================================ */
+let publicView = {handle:null, loading:false, data:null, error:null};
+
+/* Never call render() synchronously from here — viewPublic() runs *during*
+   render(), and a re-entrant render fights the caller for #view. */
+async function loadPublic(handle){
+  let next;
+  if (!cloudOn()){
+    next = {handle, loading:false, data:null, error:"Public profiles aren't switched on."};
+  } else {
+    try{
+      const res = await fetch(SUPABASE.url + "/rest/v1/public_shelves?select=*&handle=eq." +
+        encodeURIComponent(handle), {headers:{apikey:SUPABASE.anonKey}});
+      const rows = res.ok ? await res.json() : [];
+      next = rows.length
+        ? {handle, loading:false, data:rows[0], error:null}
+        : {handle, loading:false, data:null, error:"No public shelf at that name."};
+    } catch(err){
+      next = {handle, loading:false, data:null, error:"Couldn't reach the server."};
+    }
+  }
+  if (publicView.handle !== handle) return;   // navigated away mid-flight
+  publicView = next;
+  render();
+}
+
+function viewPublic(handle){
+  if (publicView.handle !== handle){
+    publicView = {handle, loading:true, data:null, error:null};
+    loadPublic(handle);                        // re-renders when it resolves
+  }
+
+  if (publicView.loading)
+    return '<div class="view"><div class="empty glass"><b>Loading…</b></div></div>';
+  if (publicView.error)
+    return '<div class="view"><header class="phead"><h1>Not <em>found</em></h1></header>' +
+      '<div class="empty glass"><b>' + esc(publicView.error) + "</b>" +
+      'Nothing to see at this address.</div>' +
+      '<div style="margin-top:20px"><button class="btn sm" data-go="tonight">Back to the app</button></div></div>';
+
+  const d = publicView.data;
+  const items = Array.isArray(d.items) ? d.items : [];
+  const done = items.filter(i => i.status === "completed").length;
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>' + esc(d.display_name || d.handle) + "<em>'s shelf</em></h1>" +
+      (d.bio ? '<p class="sub">' + esc(d.bio) + "</p>" : "") +
+      ((d.stats && d.stats.year)
+        ? '<p class="sub" style="font-size:14px">In ' + esc(d.stats.year.y) + ": <b>" +
+          esc(d.stats.year.finished) + "</b> finished, <b>" + esc(d.stats.year.hours) + "h</b> logged.</p>"
+        : "") +
+      '<p class="sub" style="font-size:14px">' + items.length + (items.length === 1 ? " game shared" : " games shared") +
+        (done ? " · " + done + " finished" : "") + "</p></header>" +
+
+    (items.length
+      ? '<div class="shelf">' + items.map(i =>
+          '<div class="card pubcard" style="--h:' + hue(i.id || i.title) + '">' +
+            '<div class="spine"><b>' + esc(i.title) + "</b></div>" +
+            '<div class="card-m">' +
+              (i.score != null ? '<span class="num" style="color:var(--purple)">' + esc(i.score) + "/10</span>" : "") +
+              '<span class="pill ' + (STATUSES[i.status] ? i.status : "backlog") + '">' +
+                esc(STATUSES[i.status] || "Backlog") + "</span>" +
+            "</div>" +
+          "</div>").join("") + "</div>"
+      : '<div class="empty glass"><b>Nothing shared yet.</b>This shelf is public but empty.</div>') +
+
+    (items.filter(i => i.review).length
+      ? '<h2 class="pub-h2">Reviews</h2>' + items.filter(i => i.review).map(i =>
+          '<article class="panel glass pubreview"><h3>' + esc(i.title) +
+            (i.score != null ? ' <span class="num">' + esc(i.score) + "/10</span>" : "") + "</h3>" +
+            '<div class="review-read">' + i.review.split(/\n\s*\n/).map(x => "<p>" + esc(x) + "</p>").join("") + "</div>" +
+          "</article>").join("")
+      : "") +
+
+    '<div style="margin-top:28px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+      '<button class="btn sm" data-go="tonight">Open Backlogged</button>' +
+      '<a class="btn ghost sm" href="mailto:dramadanov@gmail.com?subject=' +
+        encodeURIComponent("Report a Backlogged profile: " + handle) + '">Report this profile</a>' +
+    "</div></div>";
+}
+
+/* ============================================================
+   7b. ADD / EDIT A GAME
+   Only the title is required. Blank fields stay blank — the app never
+   invents a length or a critic score it doesn't have.
+   ============================================================ */
+function makeId(title){
+  const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 28) || "game";
+  let id = base, n = 2;
+  while (game(id)) id = base + "-" + (n++);
+  return id;
+}
+
+function formHTML(id){
+  const g = id ? game(id) : null;
+  const e = id ? entry(id) : null;
+  const v = x => x == null ? "" : esc(x);
+  const fld = (key, label, hint, val, type, extra) =>
+    '<label class="fld"><span>' + label + (hint ? ' <i>' + hint + "</i>" : "") + "</span>" +
+    '<input class="field" id="f_' + key + '" type="' + (type || "text") + '" value="' + v(val) + '"' +
+    (extra || "") + "></label>";
+
+  return '<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="' +
+    (g ? "Edit game" : "Add a game") + '">' +
+    '<div class="sheet-hero" style="--h:' + (g ? hue(g.id) : 268) + '">' +
+      '<button class="x" data-close="1" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>' +
+      '<div class="hero-in"><div class="hero-id">' +
+        "<h2>" + (g ? "Edit " + esc(g.title) : "Add a game") + "</h2>" +
+        '<p class="hero-sub">Only the title is required. Leave the rest blank and it simply won\'t be shown — nothing is guessed on your behalf.</p>' +
+      "</div></div></div>" +
+
+    '<div class="tabbody">' +
+      '<div class="fgrid">' +
+        '<div class="fspan">' + fld("title", "Title", "required", g && g.title, "text", ' required placeholder="Silksong"') + "</div>" +
+        fld("dev", "Developer", "", g && g.dev) +
+        fld("year", "Year", "", g && g.year, "number", ' min="1970" max="2100" placeholder="2026"') +
+        '<div class="fspan">' + fld("genres", "Genres", "comma separated", g && g.genres.join(", "), "text", ' placeholder="Action, Platformer"') + "</div>" +
+        '<div class="fspan">' + fld("platforms", "Platforms", "comma separated", g && g.platforms.join(", "), "text", ' placeholder="PC, Switch"') + "</div>" +
+      "</div>" +
+
+      '<div class="fsec"><span class="eyebrow">How long — hours</span>' +
+        '<p class="fnote">From HowLongToBeat, or your own estimate. Any you leave blank just won\'t appear as an option.</p>' +
+        '<div class="fgrid">' +
+          fld("main", "Main", "", g && g.hltb.main, "number", ' min="0" step="0.5"') +
+          fld("mainExtra", "Main + Extras", "", g && g.hltb.mainExtra, "number", ' min="0" step="0.5"') +
+          fld("completionist", "Completionist", "", g && g.hltb.completionist, "number", ' min="0" step="0.5"') +
+        "</div></div>" +
+
+      '<div class="fsec"><span class="eyebrow">Critic score — optional</span>' +
+        '<p class="fnote">Leave blank and yours becomes the only score on the page.</p>' +
+        '<div class="fgrid">' +
+          fld("oc", "OpenCritic", "0–100", g && g.oc && g.oc.score, "number", ' min="0" max="100"') +
+          fld("rec", "Critics recommend", "%", g && g.oc && g.oc.recommend, "number", ' min="0" max="100"') +
+        "</div></div>" +
+
+      '<div class="fsec"><span class="eyebrow">Your copy — optional</span>' +
+        '<p class="fnote">Only ever used to work out what an hour of playing it cost you.</p>' +
+        '<div class="fgrid">' +
+          fld("price", "What you paid", state.prefs.currency || "£", e && e.price, "number", ' min="0" step="0.01"') +
+          '<div></div><div></div>' +
+        "</div></div>" +
+
+      '<div class="rev-acts">' +
+        '<button class="btn primary sm" data-savegame="' + (id || "") + '">' + (g ? "Save changes" : "Add to the shelf") + "</button>" +
+        '<button class="btn ghost sm" data-close="1">Cancel</button>' +
+        (g ? '<button class="btn ghost sm" data-delgame="' + id + '" style="margin-left:auto;color:var(--weak)">Remove</button>' : "") +
+      "</div>" +
+    "</div></div></div>";
+}
+
+function readForm(){
+  const val = k => (document.getElementById("f_" + k) || {}).value || "";
+  const num = k => { const n = parseFloat(val(k)); return isNaN(n) ? null : n; };
+  const list = k => val(k).split(",").map(s => s.trim()).filter(Boolean);
+  const title = val("title").trim();
+  if (!title) return null;
+  return {
+    title, dev: val("dev").trim(), year: num("year"),
+    genres: list("genres"), platforms: list("platforms"),
+    hltb: {main:num("main"), mainExtra:num("mainExtra"), completionist:num("completionist")},
+    oc: num("oc") == null ? null : {score:num("oc"), recommend:num("rec") ?? null},
+    quotes: [], price: num("price")
+  };
+}
+
+function saveGame(id){
+  const editing = !!id;
+  const f = readForm();
+  if (!f){ document.getElementById("f_title")?.focus(); return toast("A title is the one thing it needs."); }
+  const price = f.price; delete f.price;
+
+  if (id){
+    const g = state.custom.find(x => x.id === id);
+    Object.assign(g, f);
+  } else {
+    f.id = makeId(f.title);
+    state.custom.push(f);
+    id = f.id;
+    const e = entry(id);
+    e.added = Date.now();
+    e.history = [{at:e.added, status:"backlog", note:""}];
+  }
+  const e = entry(id);
+  e.price = price;
+  // keep the intent pointing at something that exists
+  if (!knownIntents(game(id)).includes(e.intent)) e.intent = knownIntents(game(id))[0] || "main";
+  save(id);
+  toast(editing ? "Saved." : "Added to the shelf.");
+  location.hash = "#/game/" + id;
+}
+
+function deleteGame(id){
+  if (!isCustom(id)) return;
+  if (!confirm("Remove " + game(id).title + " and everything you wrote about it?")) return;
+  state.custom = state.custom.filter(g => g.id !== id);
+  delete state.entries[id];
+  state.week.ids = state.week.ids.filter(x => x !== id);
+  save();
+  toast("Removed.");
+  location.hash = "#/shelf";
+}
+
+/* ============================================================
+   8. ACTIONS
+   ============================================================ */
+function setStatus(id, next){
+  const e = entry(id), now = Date.now();
+  if (e.status === next) return;
+  let note = "";
+  if (next === "dropped"){
+    const r = prompt("Putting it down is fine. What made you stop?", e.reason || "");
+    if (r === null) return;
+    note = r.trim(); e.reason = note;
+  }
+  e.status = next;
+  if (next === "playing"  && !e.started)  e.started  = now;
+  if (next === "completed") e.finished = now;
+  if (next === "backlog"){ e.finished = null; e.reason = ""; }
+  e.history.push({at:now, status:next, note});
+  save();
+  toast(game(id).title + " → " + STATUSES[next]);
+}
+
+async function saveProfile(alsoPublish){
+  if (!signedIn()) return;
+  const val = id => ((document.getElementById(id) || {}).value || "").trim();
+  const handle = val("handleIn").toLowerCase();
+
+  if (alsoPublish && !/^[a-z0-9_-]{3,24}$/.test(handle))
+    return toast("Pick a handle first — 3–24 characters, letters, numbers, - and _.");
+
+  if (handle){
+    const chk = await api("/rest/v1/rpc/handle_available", {
+      method:"POST", body: JSON.stringify({want: handle})
+    });
+    if (chk.ok && (await chk.json()) === false) return toast("That handle is taken.");
+  }
+
+  const yearBox = document.getElementById("shareYearIn");
+  const patch = {
+    handle: handle || null,
+    display_name: val("nameIn") || null,
+    bio: val("bioIn") || null,
+    share_year: !!(yearBox && yearBox.checked)
+  };
+  if (alsoPublish) patch.is_public = true;
+
+  const res = await api("/rest/v1/profiles?id=eq." + session.user.id, {
+    method:"PATCH", headers:{Prefer:"return=representation"}, body: JSON.stringify(patch)
+  });
+  if (!res.ok) return toast("Couldn't save the profile.");
+
+  await fetchProfile();
+  if (alsoPublish){
+    // make sure the server is publishing the library it has, not a stale one
+    pushPending = true; await flushPush();
+    const pub = await api("/rest/v1/rpc/publish_shelf", {method:"POST"});
+    toast(pub.ok ? "Your shelf is public." : "Saved, but publishing failed.");
+  } else {
+    toast("Profile saved.");
+  }
+  render();
+}
+
+async function unpublishProfile(){
+  if (!signedIn()) return;
+  const res = await api("/rest/v1/rpc/withdraw_shelf", {method:"POST"});
+  await fetchProfile();
+  toast(res.ok ? "Your shelf is private again." : "Couldn't withdraw it.");
+  render();
+}
+
+/* Sharing toggles only matter once a shelf is live, so keep it current. */
+async function republishIfPublic(){
+  if (!signedIn() || !profile || !profile.is_public) return;
+  pushPending = true; await flushPush();
+  await api("/rest/v1/rpc/publish_shelf", {method:"POST"});
+}
+
+function currentRoute(){
+  const h = (location.hash || "#/tonight").replace(/^#\/?/, "");
+  const [view, id] = h.split("/");
+  return {view: view || "tonight", id};
+}
+function go(view){ location.hash = "#/" + view; }
+function openGame(id){ location.hash = "#/game/" + id; }
+function closeGame(){
+  if (["game","add","edit"].includes(currentRoute().view)) history.back();
+}
+
+/* ============================================================
+   9. RENDER + ROUTER
+   ============================================================ */
+function render(){
+  // Re-rendering rips out whatever is focused; blurring first keeps the browser
+  // from firing blur handlers midway through the innerHTML swap.
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  const r = currentRoute();
+  const isGame = r.view === "game";
+  const isForm = r.view === "add" || (r.view === "edit" && isCustom(r.id));
+  const isPub  = r.view === "u" && r.id;
+  const isYear = r.view === "year";
+  const overlaid = isGame || isForm;
+  const view = isPub ? "u"
+             : isYear ? "year"
+             : overlaid ? ui.view
+             : (["tonight","shelf","stats"].includes(r.view) ? r.view : "tonight");
+  if (!isPub) ui.view = view;
+
+  document.querySelectorAll(".rail-btn").forEach(b => b.classList.toggle("on", b.dataset.go === view));
+
+  const box = document.getElementById("view");
+  box.className = ui.animated === view ? "wrap" : "wrap animate";
+  ui.animated = view;
+  box.innerHTML = isPub  ? viewPublic(decodeURIComponent(r.id))
+                : isYear ? viewYear(parseInt(r.id, 10) || new Date().getFullYear())
+                : view === "shelf" ? viewShelf()
+                : view === "stats" ? viewStats()
+                : viewTonight();
+  paintSync();
+
+  const ov = document.getElementById("overlay");
+  const key = isForm ? r.view + ":" + (r.id || "") : isGame ? r.id : "";
+
+  if (isGame && game(r.id)){
+    ov.dataset.id = key;
+    ov.innerHTML = detailHTML(r.id);
+    document.body.style.overflow = "hidden";
+  } else if (isForm){
+    const wasOpen = ov.dataset.id === key;
+    ov.dataset.id = key;
+    // don't re-render a form the user is typing into
+    if (!wasOpen){
+      ov.innerHTML = formHTML(r.view === "edit" ? r.id : null);
+      ov.querySelector("#f_title")?.focus();
+    }
+    document.body.style.overflow = "hidden";
+  } else {
+    ov.innerHTML = ""; delete ov.dataset.id;
+    document.body.style.overflow = "";
+  }
+}
+
+/* one delegated handler for everything clickable */
+document.addEventListener("click", ev => {
+  const t = ev.target;
+  const hit = sel => t.closest("[" + sel + "]");
+  const r = currentRoute();
+  let el;
+
+  if ((el = hit("data-year")))   { location.hash = "#/year/" + el.dataset.year; return; }
+  if ((el = hit("data-go"))){
+    // the year rail button needs a concrete year in the route
+    if (el.dataset.go === "year"){ location.hash = "#/year/" + new Date().getFullYear(); return; }
+    return go(el.dataset.go);
+  }
+  if ((el = hit("data-open")))   return openGame(el.dataset.open);
+  if ((el = hit("data-close")))  return closeGame();
+
+  /* tonight */
+  if ((el = hit("data-app")))  { ui.appetite = ui.appetite === el.dataset.app ? null : el.dataset.app; return render(); }
+  if ((el = hit("data-mood"))) { ui.mood = ui.mood === el.dataset.mood ? null : el.dataset.mood; return render(); }
+  if ((el = hit("data-start"))){ setStatus(el.dataset.start, "playing"); return openGame(el.dataset.start); }
+  if ((el = hit("data-snooze"))){
+    const e = entry(el.dataset.snooze);
+    e.snoozed = Date.now() + 7 * D; save(el.dataset.snooze);
+    toast("Hidden for a week."); return render();
+  }
+  if ((el = hit("data-unsnooze"))){
+    entry(el.dataset.unsnooze).snoozed = 0; save(el.dataset.unsnooze);
+    ui.showSnoozed = true; return render();
+  }
+
+  /* this week */
+  if ((el = hit("data-week"))){ addToWeek(el.dataset.week); toast("On this week."); return render(); }
+  if ((el = hit("data-unweek"))){
+    state.week.ids = state.week.ids.filter(x => x !== el.dataset.unweek);
+    save(); return render();
+  }
+  if (hit("data-newweek")){ state.week = {startedAt:0, ids:[]}; save(); return render(); }
+
+  /* shelf */
+  if ((el = hit("data-f")))    { ui[el.dataset.f] = el.dataset.v; return render(); }
+  if ((el = hit("data-mode"))) { ui.mode = el.dataset.mode; return render(); }
+
+  /* add / edit a game */
+  if (hit("data-addgame"))      { location.hash = "#/add"; return; }
+  if ((el = hit("data-editgame"))){ location.hash = "#/edit/" + el.dataset.editgame; return; }
+  if ((el = hit("data-savegame"))){ return saveGame(el.dataset.savegame || null); }
+  if ((el = hit("data-delgame"))) { return deleteGame(el.dataset.delgame); }
+
+  /* data in and out */
+  if ((el = hit("data-export"))) { return exportData(el.dataset.export); }
+  if (hit("data-import"))        { document.getElementById("importFile")?.click(); return; }
+  if (hit("data-showjson"))      { ui.showData = !ui.showData; return render(); }
+
+  /* accounts */
+  if (hit("data-magic")){
+    const v = (document.getElementById("emailIn").value || "").trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return toast("That doesn't look like an email address.");
+    return signInWithEmail(v);
+  }
+  if ((el = hit("data-oauth")))  { return signInWithProvider(el.dataset.oauth); }
+  if (hit("data-signout"))       { return signOut(); }
+  if (hit("data-saveprofile"))   { return saveProfile(false); }
+  if (hit("data-publish"))       { return saveProfile(true); }
+  if (hit("data-unpublish"))     { return unpublishProfile(); }
+
+  /* detail */
+  if ((el = hit("data-intent"))){ entry(r.id).intent = el.dataset.intent; save(r.id); return render(); }
+  if ((el = hit("data-status"))){ setStatus(r.id, el.dataset.status); return render(); }
+  if ((el = hit("data-tab")))  { ui.tab = el.dataset.tab; ui.editingReview = false; return render(); }
+
+  if (hit("data-log")){
+    const inp = document.getElementById("loghrs");
+    const v = parseFloat(inp.value);
+    if (!v || v <= 0) { inp.focus(); return toast("Enter how many hours you played."); }
+    const e = entry(r.id);
+    e.hours = Math.round((e.hours + v) * 2) / 2;
+    e.sessions.push({at:Date.now(), hours:v});      // dated, so a year view can attribute it
+    if (e.status === "backlog") setStatus(r.id, "playing");
+    save(r.id); toast("Logged " + hrs(v) + "."); return render();
+  }
+  if (hit("data-resethrs")){ const e = entry(r.id); e.hours = 0; e.sessions = []; save(r.id); return render(); }
+  if (hit("data-clearest")){ entry(r.id).hltbOverride = null; save(r.id); toast("Back to HowLongToBeat."); return render(); }
+
+  if (hit("data-addnote")){
+    const inp = document.getElementById("noteInput");
+    const text = inp.value.trim();
+    if (!text) { inp.focus(); return; }
+    entry(r.id).notes.push({at:Date.now(), text});
+    save(r.id); toast("Entry added."); return render();
+  }
+  if ((el = hit("data-delnote"))){
+    const e = entry(r.id), at = Number(el.dataset.delnote);
+    e.notes = e.notes.filter(n => n.at !== at);
+    save(r.id); return render();
+  }
+
+  if (hit("data-editreview")) { ui.editingReview = true;  return render(); }
+  if (hit("data-cancelreview")){ ui.editingReview = false; return render(); }
+  if (hit("data-savereview")){
+    entry(r.id).review = document.getElementById("reviewInput").value.trim();
+    ui.editingReview = false; save(r.id); toast("Review saved."); return render();
+  }
+
+  /* click the scrim, not the sheet, to close */
+  if (t.id === "scrim") return closeGame();
+});
+
+document.addEventListener("input", ev => {
+  const t = ev.target;
+  if (t.id === "q")      { ui.q = t.value; renderShelfResults(); }
+  if (t.id === "score")  {
+    const out = document.getElementById("scoreOut");
+    out.innerHTML = parseFloat(t.value) + "<small>out of 10</small>";
+    out.style.color = "var(--purple)";     // commits the moment you drag
+  }
+  if (t.id === "weekly") {
+    const v = Math.max(1, Math.min(80, parseInt(t.value, 10) || 8));
+    state.prefs.weekly = v; save();
+  }
+});
+document.addEventListener("change", ev => {
+  const t = ev.target;
+  if (t.id === "score"){
+    entry(currentRoute().id).score = parseFloat(t.value);
+    save(currentRoute().id); render();
+  }
+  if (t.id === "weekly") render();
+  if (t.id === "paidIn"){
+    const v = parseFloat(t.value);
+    entry(currentRoute().id).price = isNaN(v) || v < 0 ? null : v;
+    save(currentRoute().id); render();
+  }
+  if (t.id === "ownEst"){
+    const v = parseFloat(t.value);
+    entry(currentRoute().id).hltbOverride = isNaN(v) || v <= 0 ? null : v;
+    save(currentRoute().id); render();
+  }
+  if (t.id === "shareIn"){
+    const e = entry(currentRoute().id);
+    e.shared = t.checked;
+    if (!e.shared) e.shareReview = false;
+    if (e.shared) e.publicTitle = game(currentRoute().id).title;   // the projection reads this
+    save(currentRoute().id); republishIfPublic(); render();
+  }
+  if (t.id === "shareRevIn"){
+    entry(currentRoute().id).shareReview = t.checked;
+    save(currentRoute().id); republishIfPublic(); render();
+  }
+  if (t.id === "importFile" && t.files && t.files[0]){
+    const reader = new FileReader();
+    reader.onload = () => importData(String(reader.result));
+    reader.onerror = () => toast("Couldn't read that file.");
+    reader.readAsText(t.files[0]);
+    t.value = "";
+  }
+});
+
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape" && ["game","add","edit"].includes(currentRoute().view)) closeGame();
+});
+
+window.addEventListener("hashchange", render);
+
+/* A queued push must not be lost to a reload or a flaky connection. */
+window.addEventListener("online",  () => { if (pushPending) flushPush(); });
+window.addEventListener("offline", () => setSync("offline"));
+window.addEventListener("focus",   () => { if (pushPending) flushPush(); });
+
+/* boot
+   Order matters: the auth fragment has to be taken out of location.hash
+   before the router ever looks at it, or a fresh sign-in reads as a bad route. */
+captureAuthFragment();
+session = session || readSession();
+state = load();
+if (!location.hash) location.replace("#/tonight");
+render();
+if (authNotice){ toast(authNotice); authNotice = ""; }
+startCloud();
+
+/* Offline shell. Registered after first paint so it never delays startup, and
+   skipped on file:// where service workers are unavailable. */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").then(reg => {
+      // A waiting worker means a newer version is already downloaded; take it
+      // rather than leaving someone on a stale build.
+      if (reg.waiting) reg.waiting.postMessage("skip-waiting");
+      reg.addEventListener("updatefound", () => {
+        const fresh = reg.installing;
+        if (!fresh) return;
+        fresh.addEventListener("statechange", () => {
+          if (fresh.state === "installed" && navigator.serviceWorker.controller)
+            toast("Updated — reload when you're ready.");
+        });
+      });
+    }).catch(() => { /* offline shell is a bonus, never a requirement */ });
+  });
+}
+</script>
+</body>
+</html>
