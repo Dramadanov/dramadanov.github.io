@@ -27,6 +27,7 @@ create table if not exists public.profiles (
   display_name  text,
   bio           text,
   is_public     boolean not null default false,
+  share_year    boolean not null default false,   -- separate opt-in from the shelf
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 
@@ -189,6 +190,32 @@ begin
                           where x->>'status' = 'completed')
          )
     into summary;
+
+  -- Year summary: a second, separate opt-in. Counts and a total only — it
+  -- reads the same private document but emits nothing identifying a game,
+  -- and nothing from notes, prices or drop reasons.
+  if prof.share_year then
+    declare yr int := extract(year from now());
+    begin
+      summary := summary || jsonb_build_object('year', jsonb_build_object(
+        'y', yr,
+        'finished', (
+          select count(*) from jsonb_each(coalesce(doc->'entries', '{}'::jsonb)) ent
+          where exists (
+            select 1 from jsonb_array_elements(coalesce(ent.value->'history', '[]'::jsonb)) h
+            where h->>'status' = 'completed'
+              and extract(year from to_timestamp((h->>'at')::bigint / 1000.0)) = yr
+          )
+        ),
+        'hours', (
+          select round(coalesce(sum((s->>'hours')::numeric), 0), 1)
+          from jsonb_each(coalesce(doc->'entries', '{}'::jsonb)) ent,
+               jsonb_array_elements(coalesce(ent.value->'sessions', '[]'::jsonb)) s
+          where extract(year from to_timestamp((s->>'at')::bigint / 1000.0)) = yr
+        )
+      ));
+    end;
+  end if;
 
   insert into public.public_shelves as s
          (user_id, handle, display_name, bio, items, stats, published_at)

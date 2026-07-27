@@ -598,6 +598,9 @@ table.games .n{font-family:var(--mono);font-variant-numeric:tabular-nums;color:v
     <button class="rail-btn" data-go="stats" aria-label="Your library">
       <svg viewBox="0 0 24 24"><path d="M3 3v16.5A1.5 1.5 0 004.5 21H21M7 15l3.5-4 3 2.5L20 7"/></svg><span>LIBRARY</span>
     </button>
+    <button class="rail-btn" data-go="year" aria-label="Your year">
+      <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3.5 9.5h17M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg><span>YEAR</span>
+    </button>
     <div class="rail-spacer"></div>
     <span class="sync" id="syncDot" hidden></span>
   </nav>
@@ -701,6 +704,7 @@ function isCustom(id){ return !!(state.custom && state.custom.some(g => g.id ===
 function blankEntry(){
   return {status:"backlog", intent:"main", added:Date.now(), started:null, finished:null,
           score:null, hours:0, price:null, hltbOverride:null, reason:"", notes:[], review:"", snoozed:0, history:[],
+          sessions:[],   // {at, hours} — hours alone carries no date, so a year view needs these
           updatedAt:Date.now(), shared:false, shareReview:false};
 }
 
@@ -752,6 +756,9 @@ function migrate(p){
     if (e.price === undefined) e.price = null;
     if (e.updatedAt == null) e.updatedAt = p.updatedAt;   // merge needs a stamp
     if (e.hltbOverride === undefined) e.hltbOverride = null;
+    // Deliberately NOT back-filled from e.hours: those hours have no date, and
+    // inventing one would put fabricated time in a year summary.
+    if (!Array.isArray(e.sessions)) e.sessions = [];
     if (e.shared === undefined) e.shared = false;         // public profile opt-in
     if (e.shareReview === undefined) e.shareReview = false;
     if (!Array.isArray(e.history)) e.history = [];
@@ -936,6 +943,15 @@ function mergeDocs(mine, theirs){
     }
     merged.history = hist.sort((x, y) => x.at - y.at);
 
+    // sessions are append-only like notes — union rather than pick a side
+    const sess = (merged.sessions || []).slice();
+    const sseen = new Set(sess.map(s => s.at + ":" + s.hours));
+    for (const s of (other.sessions || [])){
+      const k = s.at + ":" + s.hours;
+      if (!sseen.has(k)){ sess.push(s); sseen.add(k); }
+    }
+    merged.sessions = sess.sort((x, y) => x.at - y.at);
+
     merged.hours = Math.max(a.hours || 0, b.hours || 0);   // hours only ever go up
     out.entries[id] = merged;
   }
@@ -1058,10 +1074,10 @@ async function syncOnSignIn(){
 }
 
 async function fetchProfile(){
-  const res = await api("/rest/v1/profiles?select=handle,display_name,bio,is_public&id=eq." + session.user.id);
+  const res = await api("/rest/v1/profiles?select=handle,display_name,bio,is_public,share_year&id=eq." + session.user.id);
   if (!res.ok) return;
   const rows = await res.json();
-  profile = rows[0] || {handle:null, display_name:null, bio:null, is_public:false};
+  profile = rows[0] || {handle:null, display_name:null, bio:null, is_public:false, share_year:false};
 }
 
 async function startCloud(){
@@ -1614,6 +1630,9 @@ function accountPanel(){
       "</div>" +
       '<label class="fld" style="margin-top:14px"><span>Bio</span>' +
         '<input class="field" id="bioIn" value="' + esc(p.bio || "") + '" placeholder="Optional, 400 characters"></label>' +
+      '<label class="tick" style="margin-top:14px"><input type="checkbox" id="shareYearIn"' +
+        (p.share_year ? " checked" : "") + "> Also show this year's totals — how many games you finished and hours logged" +
+        "</label>" +
       '<div class="data-acts">' +
         '<button class="btn sm" data-saveprofile="1">Save profile</button>' +
         (p.is_public
@@ -1971,6 +1990,143 @@ function detailHTML(id){
 }
 
 /* ============================================================
+   6c. THE YEAR
+   Most gamers can recall fewer than half the games they played in a year.
+   This is the panel that answers "what did I actually do?" — but only from
+   data that carries a real date. Hours logged before sessions existed have
+   none, and are reported as unknown rather than guessed at.
+   ============================================================ */
+const yearOf = ts => new Date(ts).getFullYear();
+
+function yearSummary(y){
+  const games = getGames();
+  let sessionHours = 0, sessionCount = 0, notes = 0, reviews = 0, spent = 0;
+  const finished = [], started = [], scored = [], journalled = [];
+  let undatedHours = 0;
+
+  for (const g of games){
+    const e = entry(g.id);
+
+    let mine = 0;
+    for (const s of (e.sessions || [])) if (yearOf(s.at) === y){ mine += s.hours; sessionCount++; }
+    sessionHours += mine;
+    // hours on the books with no session behind them predate this feature
+    const accounted = (e.sessions || []).reduce((n, s) => n + s.hours, 0);
+    undatedHours += Math.max(0, (e.hours || 0) - accounted);
+
+    for (const n of (e.notes || [])) if (yearOf(n.at) === y) notes++;
+    const jThisYear = (e.notes || []).filter(n => yearOf(n.at) === y).length;
+    if (jThisYear) journalled.push({g, e, n:jThisYear});
+
+    for (const h of (e.history || [])){
+      if (yearOf(h.at) !== y) continue;
+      if (h.status === "completed") finished.push({g, e, at:h.at});
+      if (h.status === "playing")   started.push({g, e, at:h.at});
+    }
+    if (e.finished && yearOf(e.finished) === y){
+      if (e.review) reviews++;
+      if (e.score != null) scored.push({g, e});
+      if (e.price != null) spent += e.price;
+    }
+  }
+
+  finished.sort((a, b) => a.at - b.at);
+  scored.sort((a, b) => b.e.score - a.e.score);
+  journalled.sort((a, b) => b.n - a.n);
+
+  const longest = finished.slice().sort((a, b) => lengthOf(b.g, b.e) - lengthOf(a.g, a.e))[0];
+  const surprise = scored
+    .filter(x => x.g.oc && x.g.oc.score != null)
+    .map(x => ({...x, gap: x.e.score - x.g.oc.score / 10}))
+    .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))[0];
+
+  return {y, sessionHours, sessionCount, undatedHours, notes, reviews, spent,
+          finished, started, scored, journalled, longest, surprise};
+}
+
+function yearsWithData(){
+  const set = new Set([new Date().getFullYear()]);
+  for (const g of getGames()){
+    const e = entry(g.id);
+    for (const h of (e.history || [])) set.add(yearOf(h.at));
+    for (const s of (e.sessions || [])) set.add(yearOf(s.at));
+  }
+  return [...set].sort((a, b) => b - a);
+}
+
+function viewYear(y){
+  const s = yearSummary(y);
+  const years = yearsWithData();
+  const nothing = !s.finished.length && !s.sessionHours && !s.notes && !s.started.length;
+
+  const card = (eyebrow, body) =>
+    '<section class="panel glass"><span class="eyebrow">' + eyebrow + "</span>" + body + "</section>";
+
+  const gameLine = (x, right) =>
+    '<button class="row" data-open="' + x.g.id + '"><span class="rn">' + esc(x.g.title) + "</span>" +
+    '<span class="rv">' + right + "</span></button>";
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>' + y + ' in <em>play</em></h1>' +
+    '<p class="sub">' + (nothing
+      ? "Nothing recorded for this year yet."
+      : "What you actually played, from what carries a date.") + "</p>" +
+    '<div class="chips" style="margin-top:16px">' + years.map(yy =>
+      '<button class="chip' + (yy === y ? " on" : "") + '" data-year="' + yy + '">' + yy + "</button>").join("") +
+    "</div></header>" +
+
+    '<div class="stat-grid">' +
+      '<section class="panel glass lead"><span class="eyebrow">Games finished</span>' +
+        '<div class="lead-n">' + s.finished.length +
+          "<small>" + (s.finished.length === 1 ? "game seen through" : "games seen through") + "</small></div>" +
+        (s.finished.length
+          ? '<p class="lead-say">Started with <b>' + esc(s.finished[0].g.title) + "</b>" +
+            (s.finished.length > 1 ? ", most recently <b>" + esc(s.finished[s.finished.length-1].g.title) + "</b>" : "") + ".</p>"
+          : '<p class="lead-say">Nothing finished this year — which is a fact, not a verdict.</p>') +
+        (s.sessionHours
+          ? '<p class="ahead"><b>' + hrs(s.sessionHours) + "</b> logged across " + s.sessionCount +
+            (s.sessionCount === 1 ? " session" : " sessions") + "." +
+            (s.undatedHours ? " A further " + hrs(s.undatedHours) + " sits on your shelf without a date — " +
+              "logged before sessions were recorded, so it can't be attributed to a year." : "") + "</p>"
+          : '<p class="ahead">No dated hours yet. Hours logged from now on are stamped, so next year this fills in.' +
+            (s.undatedHours ? " (" + hrs(s.undatedHours) + " is on the books but undated.)" : "") + "</p>") +
+      "</section>" +
+
+      card("Finished", s.finished.length
+        ? '<div class="rows">' + s.finished.slice().reverse().slice(0, 8).map(x =>
+            gameLine(x, dateText(x.at))).join("") + "</div>"
+        : '<p class="pnote">Nothing yet.</p>') +
+
+      card("Best of the year", s.scored.length
+        ? '<div class="rows">' + s.scored.slice(0, 5).map(x =>
+            gameLine(x, x.e.score + "/10")).join("") + "</div>"
+        : '<p class="pnote">Score a game you finished and it shows up here.</p>') +
+
+      card("Biggest disagreement", s.surprise
+        ? '<div class="rows">' + gameLine(s.surprise,
+            (s.surprise.gap > 0 ? "+" : "") + s.surprise.gap.toFixed(1)) + "</div>" +
+          '<p class="pnote">You rated <b>' + esc(s.surprise.g.title) + "</b> " +
+            Math.abs(s.surprise.gap).toFixed(1) + " " + (s.surprise.gap > 0 ? "higher" : "lower") +
+            " than the critics did.</p>"
+        : '<p class="pnote">Needs a finished game with both your score and a critic score.</p>') +
+
+      card("Longest haul", s.longest
+        ? '<div class="rows">' + gameLine(s.longest, hrs(lengthOf(s.longest.g, s.longest.e))) + "</div>" +
+          '<p class="pnote">The biggest thing you saw through this year.</p>'
+        : '<p class="pnote">Nothing finished yet.</p>') +
+
+      card("Written down", '<div class="rows">' +
+        '<div class="row"><span class="rn">Journal entries</span><span class="rv">' + s.notes + "</span></div>" +
+        '<div class="row"><span class="rn">Reviews</span><span class="rv">' + s.reviews + "</span></div>" +
+        '<div class="row"><span class="rn">Games started</span><span class="rv">' + s.started.length + "</span></div>" +
+        "</div>" +
+        (s.journalled.length
+          ? '<p class="pnote">Most journalled: <b>' + esc(s.journalled[0].g.title) + "</b>.</p>" : "")) +
+
+    "</div></div>";
+}
+
+/* ============================================================
    6b. A PUBLIC SHELF — the one route that works signed out
    Content here is written by other people, so everything goes through
    esc() and nothing is trusted.
@@ -2021,6 +2177,10 @@ function viewPublic(handle){
   return '<div class="view">' +
     '<header class="phead"><h1>' + esc(d.display_name || d.handle) + "<em>'s shelf</em></h1>" +
       (d.bio ? '<p class="sub">' + esc(d.bio) + "</p>" : "") +
+      ((d.stats && d.stats.year)
+        ? '<p class="sub" style="font-size:14px">In ' + esc(d.stats.year.y) + ": <b>" +
+          esc(d.stats.year.finished) + "</b> finished, <b>" + esc(d.stats.year.hours) + "h</b> logged.</p>"
+        : "") +
       '<p class="sub" style="font-size:14px">' + items.length + (items.length === 1 ? " game shared" : " games shared") +
         (done ? " · " + done + " finished" : "") + "</p></header>" +
 
@@ -2208,10 +2368,12 @@ async function saveProfile(alsoPublish){
     if (chk.ok && (await chk.json()) === false) return toast("That handle is taken.");
   }
 
+  const yearBox = document.getElementById("shareYearIn");
   const patch = {
     handle: handle || null,
     display_name: val("nameIn") || null,
-    bio: val("bioIn") || null
+    bio: val("bioIn") || null,
+    share_year: !!(yearBox && yearBox.checked)
   };
   if (alsoPublish) patch.is_public = true;
 
@@ -2269,8 +2431,10 @@ function render(){
   const isGame = r.view === "game";
   const isForm = r.view === "add" || (r.view === "edit" && isCustom(r.id));
   const isPub  = r.view === "u" && r.id;
+  const isYear = r.view === "year";
   const overlaid = isGame || isForm;
   const view = isPub ? "u"
+             : isYear ? "year"
              : overlaid ? ui.view
              : (["tonight","shelf","stats"].includes(r.view) ? r.view : "tonight");
   if (!isPub) ui.view = view;
@@ -2280,7 +2444,8 @@ function render(){
   const box = document.getElementById("view");
   box.className = ui.animated === view ? "wrap" : "wrap animate";
   ui.animated = view;
-  box.innerHTML = isPub ? viewPublic(decodeURIComponent(r.id))
+  box.innerHTML = isPub  ? viewPublic(decodeURIComponent(r.id))
+                : isYear ? viewYear(parseInt(r.id, 10) || new Date().getFullYear())
                 : view === "shelf" ? viewShelf()
                 : view === "stats" ? viewStats()
                 : viewTonight();
@@ -2315,7 +2480,12 @@ document.addEventListener("click", ev => {
   const r = currentRoute();
   let el;
 
-  if ((el = hit("data-go")))     return go(el.dataset.go);
+  if ((el = hit("data-year")))   { location.hash = "#/year/" + el.dataset.year; return; }
+  if ((el = hit("data-go"))){
+    // the year rail button needs a concrete year in the route
+    if (el.dataset.go === "year"){ location.hash = "#/year/" + new Date().getFullYear(); return; }
+    return go(el.dataset.go);
+  }
   if ((el = hit("data-open")))   return openGame(el.dataset.open);
   if ((el = hit("data-close")))  return closeGame();
 
@@ -2379,10 +2549,11 @@ document.addEventListener("click", ev => {
     if (!v || v <= 0) { inp.focus(); return toast("Enter how many hours you played."); }
     const e = entry(r.id);
     e.hours = Math.round((e.hours + v) * 2) / 2;
+    e.sessions.push({at:Date.now(), hours:v});      // dated, so a year view can attribute it
     if (e.status === "backlog") setStatus(r.id, "playing");
     save(r.id); toast("Logged " + hrs(v) + "."); return render();
   }
-  if (hit("data-resethrs")){ entry(r.id).hours = 0; save(r.id); return render(); }
+  if (hit("data-resethrs")){ const e = entry(r.id); e.hours = 0; e.sessions = []; save(r.id); return render(); }
   if (hit("data-clearest")){ entry(r.id).hltbOverride = null; save(r.id); toast("Back to HowLongToBeat."); return render(); }
 
   if (hit("data-addnote")){
