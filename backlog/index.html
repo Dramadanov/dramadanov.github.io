@@ -31,6 +31,12 @@
 ">
 <title>Backlogged | Tackle the pile</title>
 <meta name="description" content="A backlog is a decision, not a list. Length, critical reception and your own verdict — enough to pick what to play tonight.">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#08080b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Backlogged">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0e15'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='21' font-weight='600' fill='%23c084fc' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2474,6 +2480,26 @@ if (!location.hash) location.replace("#/tonight");
 render();
 if (authNotice){ toast(authNotice); authNotice = ""; }
 startCloud();
+
+/* Offline shell. Registered after first paint so it never delays startup, and
+   skipped on file:// where service workers are unavailable. */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").then(reg => {
+      // A waiting worker means a newer version is already downloaded; take it
+      // rather than leaving someone on a stale build.
+      if (reg.waiting) reg.waiting.postMessage("skip-waiting");
+      reg.addEventListener("updatefound", () => {
+        const fresh = reg.installing;
+        if (!fresh) return;
+        fresh.addEventListener("statechange", () => {
+          if (fresh.state === "installed" && navigator.serviceWorker.controller)
+            toast("Updated — reload when you're ready.");
+        });
+      });
+    }).catch(() => { /* offline shell is a bonus, never a requirement */ });
+  });
+}
 </script>
 </body>
 </html>
