@@ -287,6 +287,29 @@ details.why-these b{color:var(--text);font-weight:600}
 .data-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
 #jsonOut{margin-top:12px;font-family:var(--mono);font-size:11px;line-height:1.5}
 
+/* ---------- accounts, sync, public shelves ---------- */
+.sync{font-size:9px;letter-spacing:.04em;font-weight:600;text-align:center;color:var(--faint);
+  padding:6px 4px;line-height:1.3;max-width:64px}
+.sync.syncing{color:var(--sky)}
+.sync.synced{color:var(--mighty)}
+.sync.offline,.sync.error{color:var(--fair)}
+.pnote{font-size:13px;color:var(--muted);line-height:1.6;margin-top:8px;max-width:62ch}
+.pnote b{color:var(--text);font-weight:600}
+.pnote code{font-family:var(--mono);font-size:12px;color:var(--indigo)}
+.signin{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+.signin .field{flex:1;min-width:180px}
+.sharebar{gap:18px}
+.tick{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.tick input{accent-color:var(--purple);width:14px;height:14px;cursor:pointer}
+.tick input:disabled{cursor:not-allowed;opacity:.4}
+.pubcard{cursor:default}
+.pubcard:hover{transform:none}
+.pub-h2{font-family:var(--serif);font-size:26px;font-weight:600;margin:38px 0 18px}
+.pubreview{margin-bottom:18px}
+.pubreview h3{font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:14px}
+.pubreview h3 .num{font-size:14px;color:var(--purple);margin-left:8px}
+a.btn{text-decoration:none}
+
 /* ---------- filters rail ---------- */
 .shelf-layout{display:grid;grid-template-columns:212px 1fr;gap:34px;align-items:start}
 /* grid items default to min-width:auto, which lets scroll containers push the page sideways */
@@ -542,6 +565,7 @@ table.games .n{font-family:var(--mono);font-variant-numeric:tabular-nums;color:v
       <svg viewBox="0 0 24 24"><path d="M3 3v16.5A1.5 1.5 0 004.5 21H21M7 15l3.5-4 3 2.5L20 7"/></svg><span>LIBRARY</span>
     </button>
     <div class="rail-spacer"></div>
+    <span class="sync" id="syncDot" hidden></span>
   </nav>
 
   <main class="main"><div class="wrap" id="view"></div></main>
@@ -552,6 +576,23 @@ table.games .n{font-family:var(--mono);font-variant-numeric:tabular-nums;color:v
 
 <script>
 "use strict";
+/* ============================================================
+   0. BACKEND — optional
+   Paste your Supabase project URL and anon key here to switch on
+   accounts, cross-device sync and public profiles. Leave them empty
+   and the app behaves exactly as it always has: everything local,
+   no network, no sign-in UI anywhere.
+
+   The anon key is MEANT to be public — row-level security is what
+   protects the data, and it is tested in backlog/schema.sql.
+   The service_role key must never appear in this file.
+   ============================================================ */
+const SUPABASE = {
+  url:     "",   // https://YOUR-PROJECT.supabase.co
+  anonKey: ""    // the "anon public" key from Settings → API
+};
+const cloudOn = () => !!(SUPABASE.url && SUPABASE.anonKey);
+
 /* ============================================================
    1. SEED DATA
    HowLongToBeat times (hours) and OpenCritic scores are baked in
@@ -625,7 +666,8 @@ function isCustom(id){ return !!(state.custom && state.custom.some(g => g.id ===
 
 function blankEntry(){
   return {status:"backlog", intent:"main", added:Date.now(), started:null, finished:null,
-          score:null, hours:0, price:null, reason:"", notes:[], review:"", snoozed:0, history:[]};
+          score:null, hours:0, price:null, reason:"", notes:[], review:"", snoozed:0, history:[],
+          updatedAt:Date.now(), shared:false, shareReview:false};
 }
 
 function firstRun(){
@@ -658,7 +700,8 @@ function firstRun(){
                 disco:34.99, davethediver:17.99, cyberpunk:44.99, witcher3:24.99};
   for (const id in paid) if (entries[id]) entries[id].price = paid[id];
 
-  return {entries, custom:[], week:{startedAt:0, ids:[]}, prefs:{weekly:8, currency:"£"}};
+  return {entries, custom:[], week:{startedAt:0, ids:[]}, prefs:{weekly:8, currency:"£"},
+          seeded:true, updatedAt:Date.now()};
 }
 
 /* Older saves predate custom games, the weekly shortlist and prices. */
@@ -668,7 +711,16 @@ function migrate(p){
   p.prefs = p.prefs || {};
   if (p.prefs.weekly == null) p.prefs.weekly = 8;
   if (!p.prefs.currency) p.prefs.currency = "£";
-  for (const id in p.entries) if (p.entries[id].price === undefined) p.entries[id].price = null;
+  if (p.updatedAt == null) p.updatedAt = Date.now();
+  if (p.seeded == null) p.seeded = false;
+  for (const id in p.entries){
+    const e = p.entries[id];
+    if (e.price === undefined) e.price = null;
+    if (e.updatedAt == null) e.updatedAt = p.updatedAt;   // merge needs a stamp
+    if (e.shared === undefined) e.shared = false;         // public profile opt-in
+    if (e.shareReview === undefined) e.shareReview = false;
+    if (!Array.isArray(e.history)) e.history = [];
+  }
   return p;
 }
 
@@ -686,13 +738,308 @@ function load(){
   try{ localStorage.setItem(KEY, JSON.stringify(fresh)); } catch(err){ /* private mode — run in memory */ }
   return fresh;
 }
-function save(){
+/* `touched` is the game whose entry just changed. Stamping it is what lets
+   two devices that edited different games both keep their work on merge. */
+function save(touched){
+  const now = Date.now();
+  if (touched && state.entries[touched]) state.entries[touched].updatedAt = now;
+  state.updatedAt = now;
+  state.seeded = false;                       // any save means real user data
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }
   catch(err){ toast("Couldn't save — storage is full or blocked."); }
+  queuePush();
 }
 function entry(id){
   if (!state.entries[id]) state.entries[id] = blankEntry();
   return state.entries[id];
+}
+
+/* ============================================================
+   2b. ACCOUNTS AND SYNC — all optional
+   Plain fetch against Supabase's GoTrue and PostgREST endpoints, so
+   the app stays one file with no dependencies. Every function here
+   is a no-op when SUPABASE is unconfigured.
+   ============================================================ */
+const AUTH_KEY = "backlog:auth";
+let session = null;          // {access_token, refresh_token, expires_at, user}
+let profile = null;          // {handle, display_name, bio, is_public}
+let remoteRev = 0;           // last rev we know the server had
+let syncStatus = "off";      // off | local | syncing | synced | offline | conflict | error
+let pushTimer = null, pushPending = false, pushing = false, authNotice = "";
+
+const signedIn = () => !!(session && session.user);
+
+function readSession(){
+  try{ return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch(err){ return null; }
+}
+function writeSession(s){
+  session = s;
+  try{
+    if (s) localStorage.setItem(AUTH_KEY, JSON.stringify(s));
+    else localStorage.removeItem(AUTH_KEY);
+  } catch(err){ /* private mode */ }
+}
+function redirectBase(){ return location.href.split("#")[0]; }
+
+/* GoTrue hands tokens back in the URL *fragment*, which is also where our
+   router lives. This must run before any routing or sign-in reads as a
+   broken route. */
+function captureAuthFragment(){
+  const raw = location.hash || "";
+  if (!/[#&](access_token|error|error_description)=/.test(raw)) return;
+
+  const p = new URLSearchParams(raw.replace(/^#/, ""));
+  const err = p.get("error_description") || p.get("error");
+  const at = p.get("access_token");
+
+  // strip the credentials out of the address bar immediately
+  history.replaceState(null, "", location.pathname + location.search + "#/tonight");
+
+  if (err){ authNotice = decodeURIComponent(err.replace(/\+/g, " ")); return; }
+  if (!at) return;
+
+  writeSession({
+    access_token: at,
+    refresh_token: p.get("refresh_token") || "",
+    expires_at: Date.now() + (parseInt(p.get("expires_in"), 10) || 3600) * 1000,
+    user: null                                  // filled in by fetchUser()
+  });
+  authNotice = "Signed in.";
+}
+
+async function api(path, opts){
+  opts = opts || {};
+  const headers = Object.assign({
+    apikey: SUPABASE.anonKey,
+    "Content-Type": "application/json"
+  }, opts.headers || {});
+  if (session && session.access_token) headers.Authorization = "Bearer " + session.access_token;
+
+  const res = await fetch(SUPABASE.url + path, Object.assign({}, opts, {headers}));
+  if (res.status === 401 && !opts._retried && session && session.refresh_token){
+    if (await refreshSession()) return api(path, Object.assign({}, opts, {_retried:true}));
+  }
+  return res;
+}
+
+async function refreshSession(){
+  try{
+    const res = await fetch(SUPABASE.url + "/auth/v1/token?grant_type=refresh_token", {
+      method:"POST",
+      headers:{apikey:SUPABASE.anonKey, "Content-Type":"application/json"},
+      body: JSON.stringify({refresh_token: session.refresh_token})
+    });
+    if (!res.ok){ writeSession(null); return false; }
+    const j = await res.json();
+    writeSession({
+      access_token: j.access_token, refresh_token: j.refresh_token,
+      expires_at: Date.now() + (j.expires_in || 3600) * 1000,
+      user: j.user || (session && session.user) || null
+    });
+    return true;
+  } catch(err){ return false; }
+}
+
+async function fetchUser(){
+  const res = await api("/auth/v1/user");
+  if (!res.ok) return false;
+  const u = await res.json();
+  session.user = {id:u.id, email:u.email};
+  writeSession(session);
+  return true;
+}
+
+async function signInWithEmail(email){
+  const res = await api("/auth/v1/otp?redirect_to=" + encodeURIComponent(redirectBase()), {
+    method:"POST", body: JSON.stringify({email, create_user:true})
+  });
+  if (res.ok) return toast("Check your email for the link.");
+  const j = await res.json().catch(() => ({}));
+  toast(j.msg || j.error_description || "Couldn't send the link.");
+}
+
+function signInWithProvider(provider){
+  location.href = SUPABASE.url + "/auth/v1/authorize?provider=" + encodeURIComponent(provider) +
+                  "&redirect_to=" + encodeURIComponent(redirectBase());
+}
+
+async function signOut(){
+  try{ await api("/auth/v1/logout", {method:"POST"}); } catch(err){ /* going anyway */ }
+  writeSession(null);
+  profile = null; remoteRev = 0; syncStatus = "local";
+  toast("Signed out. Your games are still here on this device.");
+  render();
+}
+
+/* ---- merge -------------------------------------------------------------
+   Per-game last-write-wins, which resolves the realistic case (two devices
+   touched different games) without loss. Notes and history are append-only
+   so they union instead — a note should never be destroyed by a merge. */
+function mergeDocs(mine, theirs){
+  const out = JSON.parse(JSON.stringify(theirs));
+  out.entries = out.entries || {};
+  out.custom  = Array.isArray(out.custom) ? out.custom : [];
+
+  for (const id in (mine.entries || {})){
+    const a = mine.entries[id], b = out.entries[id];
+    if (!b){ out.entries[id] = a; continue; }
+
+    const aWins = (a.updatedAt || 0) >= (b.updatedAt || 0);
+    const merged = JSON.parse(JSON.stringify(aWins ? a : b));
+    const other  = aWins ? b : a;
+
+    const notes = (merged.notes || []).slice();
+    const seen = new Set(notes.map(n => n.at));
+    for (const n of (other.notes || [])) if (!seen.has(n.at)){ notes.push(n); seen.add(n.at); }
+    merged.notes = notes.sort((x, y) => x.at - y.at);
+
+    const hist = (merged.history || []).slice();
+    const hseen = new Set(hist.map(h => h.at + ":" + h.status));
+    for (const h of (other.history || [])){
+      const k = h.at + ":" + h.status;
+      if (!hseen.has(k)){ hist.push(h); hseen.add(k); }
+    }
+    merged.history = hist.sort((x, y) => x.at - y.at);
+
+    merged.hours = Math.max(a.hours || 0, b.hours || 0);   // hours only ever go up
+    out.entries[id] = merged;
+  }
+
+  const have = new Set(out.custom.map(g => g.id));
+  for (const g of (mine.custom || [])) if (!have.has(g.id)) out.custom.push(g);
+
+  if ((mine.updatedAt || 0) > (theirs.updatedAt || 0)){
+    out.week = mine.week; out.prefs = mine.prefs;
+  }
+  out.updatedAt = Math.max(mine.updatedAt || 0, theirs.updatedAt || 0);
+  out.seeded = false;
+  return out;
+}
+
+/* ---- push / pull ------------------------------------------------------- */
+async function pullRemote(){
+  const res = await api("/rest/v1/libraries?select=doc,rev&user_id=eq." + session.user.id);
+  if (!res.ok) return null;
+  const rows = await res.json();
+  if (!rows.length) return null;
+  remoteRev = rows[0].rev;
+  return rows[0].doc;
+}
+
+async function pushRemote(){
+  const uid = session.user.id;
+  const body = {doc: state, rev: remoteRev + 1};
+
+  if (remoteRev === 0){
+    const res = await api("/rest/v1/libraries", {
+      method:"POST", headers:{Prefer:"return=representation"},
+      body: JSON.stringify(Object.assign({user_id: uid}, body))
+    });
+    if (res.ok){ const r = await res.json(); remoteRev = (r[0] && r[0].rev) || 1; return true; }
+    if (res.status !== 409) return false;      // 409 = row already there, fall through
+    const cur = await pullRemote();
+    if (cur == null) return false;
+  }
+
+  // rev guard: zero rows back means another device wrote first
+  const res = await api("/rest/v1/libraries?user_id=eq." + uid + "&rev=eq." + remoteRev, {
+    method:"PATCH", headers:{Prefer:"return=representation"},
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) return false;
+  const rows = await res.json();
+  if (!rows.length) return "conflict";
+  remoteRev = rows[0].rev;
+  return true;
+}
+
+function setSync(s){ if (syncStatus !== s){ syncStatus = s; paintSync(); } }
+
+function queuePush(){
+  if (!cloudOn() || !signedIn()) return;
+  pushPending = true;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(flushPush, 2000);
+}
+
+async function flushPush(){
+  if (!cloudOn() || !signedIn() || !pushPending) return;
+  // 'online' and 'focus' routinely fire together, and two concurrent pushes
+  // race each other for the rev guard — the loser then reports a failure that
+  // never happened.
+  if (pushing) return;
+  if (!navigator.onLine) return setSync("offline");
+
+  pushing = true;
+  setSync("syncing");
+  try{
+    let r = await pushRemote();
+    if (r === "conflict"){
+      const theirs = await pullRemote();
+      if (theirs){
+        state = migrate(mergeDocs(state, theirs));
+        try{ localStorage.setItem(KEY, JSON.stringify(state)); } catch(err){}
+        r = await pushRemote();
+        render();
+        toast("Merged changes from another device.");
+      }
+    }
+    if (r === true){ pushPending = false; setSync("synced"); }
+    else {
+      setSync("error");
+      clearTimeout(pushTimer);              // the label promises a retry, so retry
+      pushTimer = setTimeout(flushPush, 4000);
+    }
+  } catch(err){
+    setSync(navigator.onLine ? "error" : "offline");
+  } finally {
+    pushing = false;
+  }
+}
+
+/* First sign-in: decide between adopting what's on this device, pulling what
+   the account already has, or merging both. Never silently discard either. */
+async function syncOnSignIn(){
+  setSync("syncing");
+  const theirs = await pullRemote();
+
+  if (theirs == null){
+    pushPending = true;
+    await flushPush();
+    return;
+  }
+  if (state.seeded){
+    state = migrate(theirs);
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); } catch(err){}
+    setSync("synced");
+    toast("Loaded your library.");
+    return;
+  }
+  state = migrate(mergeDocs(state, theirs));
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); } catch(err){}
+  pushPending = true;
+  await flushPush();
+  toast("Merged this device with your account.");
+}
+
+async function fetchProfile(){
+  const res = await api("/rest/v1/profiles?select=handle,display_name,bio,is_public&id=eq." + session.user.id);
+  if (!res.ok) return;
+  const rows = await res.json();
+  profile = rows[0] || {handle:null, display_name:null, bio:null, is_public:false};
+}
+
+async function startCloud(){
+  if (!cloudOn()) { syncStatus = "off"; return; }
+  syncStatus = "local";
+  if (!session) return;
+  if (session.expires_at && session.expires_at < Date.now() + 60000){
+    if (!await refreshSession()) return;
+  }
+  if (!session.user && !await fetchUser()){ writeSession(null); return; }
+  await fetchProfile();
+  await syncOnSignIn();
+  render();
 }
 
 /* ============================================================
@@ -1122,6 +1469,87 @@ function importData(text){
   render();
 }
 
+const SYNC_WORDS = {
+  off:      "",
+  local:    "On this device",
+  syncing:  "Syncing…",
+  synced:   "Synced",
+  offline:  "Offline — will sync",
+  error:    "Sync failed — retrying"
+};
+function paintSync(){
+  const el = document.getElementById("syncDot");
+  if (!el) return;
+  el.className = "sync " + syncStatus;
+  el.textContent = SYNC_WORDS[syncStatus] || "";
+  // Only means anything to someone with an account. A signed-out visitor
+  // reading a public profile doesn't need to be told where data lives.
+  el.hidden = syncStatus === "off" || !signedIn();
+}
+
+/* Sign-in, account and public-profile controls. Absent entirely when the
+   backend is unconfigured, so the app is unchanged without it. */
+function accountPanel(){
+  if (!cloudOn()){
+    return '<section class="panel glass"><span class="eyebrow">Accounts</span>' +
+      '<p class="pnote">Not switched on. Add a Supabase URL and anon key at the top of this file to enable ' +
+      'sign-in, cross-device sync and public profiles. Everything works without it — the data just stays in this browser.</p>' +
+      "</section>";
+  }
+
+  if (!signedIn()){
+    return '<section class="panel glass"><span class="eyebrow">Sign in — optional</span>' +
+      '<p class="pnote">Signing in syncs your library across devices and keeps it if this browser is cleared. ' +
+      'Whatever you already have here comes with you.</p>' +
+      '<div class="signin">' +
+        '<input class="field" id="emailIn" type="email" placeholder="you@example.com" autocomplete="email" aria-label="Email address">' +
+        '<button class="btn primary sm" data-magic="1">Email me a link</button>' +
+      "</div>" +
+      '<div class="data-acts" style="margin-top:12px">' +
+        '<button class="btn sm" data-oauth="github">Continue with GitHub</button>' +
+        '<button class="btn sm" data-oauth="google">Continue with Google</button>' +
+      "</div>" +
+      '<p class="pnote" style="margin-top:14px">No password to forget, and none for us to store.</p>' +
+    "</section>";
+  }
+
+  const p = profile || {};
+  const shared = getGames().filter(g => entry(g.id).shared).length;
+  return '<section class="panel glass"><span class="eyebrow">Account</span>' +
+    '<p class="pnote">Signed in as <b>' + esc(session.user && session.user.email || "you") + "</b>. " +
+      "Your library syncs automatically.</p>" +
+
+    '<div class="fsec"><span class="eyebrow">Public profile</span>' +
+      '<p class="fnote">Off unless you turn it on. Only games you tick as shared ever appear, and journal notes, ' +
+      'prices and drop reasons are never published — the server strips them, not the browser.</p>' +
+      '<div class="fgrid">' +
+        '<label class="fld"><span>Handle <i>a–z, 0–9, - and _</i></span>' +
+          '<input class="field" id="handleIn" value="' + esc(p.handle || "") + '" placeholder="yourname"></label>' +
+        '<label class="fld"><span>Display name</span>' +
+          '<input class="field" id="nameIn" value="' + esc(p.display_name || "") + '" placeholder="Optional"></label>' +
+      "</div>" +
+      '<label class="fld" style="margin-top:14px"><span>Bio</span>' +
+        '<input class="field" id="bioIn" value="' + esc(p.bio || "") + '" placeholder="Optional, 400 characters"></label>' +
+      '<div class="data-acts">' +
+        '<button class="btn sm" data-saveprofile="1">Save profile</button>' +
+        (p.is_public
+          ? '<button class="btn sm" data-publish="1">Republish (' + shared + " shared)</button>" +
+            '<button class="btn ghost sm" data-unpublish="1">Make private</button>' +
+            (p.handle ? '<a class="btn ghost sm" href="#/u/' + encodeURIComponent(p.handle) + '">View it</a>' : "")
+          : '<button class="btn primary sm" data-publish="1">Make my shelf public</button>') +
+      "</div>" +
+      (p.is_public && p.handle
+        ? '<p class="pnote" style="margin-top:12px">Live at <code>#/u/' + esc(p.handle) + "</code> · " +
+          shared + (shared === 1 ? " game shared" : " games shared") + ". Tick games to share on their own page.</p>"
+        : "") +
+    "</div>" +
+
+    '<div class="data-acts" style="margin-top:20px">' +
+      '<button class="btn ghost sm" data-signout="1">Sign out</button>' +
+    "</div>" +
+  "</section>";
+}
+
 function dataPanel(){
   return '<section class="panel glass"><span class="eyebrow">Your data</span>' +
     '<p style="font-size:13.5px;color:var(--muted);line-height:1.6">It lives in this browser and nowhere else — no account, no server. Take a copy before you clear your history.</p>' +
@@ -1280,6 +1708,7 @@ function viewStats(){
           : '<p style="color:var(--faint);font-size:13.5px">Add what you paid on a game\'s page and this works out your cost per hour. It is usually a nicer number than you expect.</p>') +
       "</section>" +
 
+      accountPanel() +
       dataPanel() +
 
     "</div></div>";
@@ -1418,12 +1847,106 @@ function detailHTML(id){
         : "") +
     "</div>" +
 
+    // only meaningful once there's a public profile to put it on
+    (signedIn() && profile && profile.is_public
+      ? '<div class="statusbar sharebar"><span class="eyebrow">On my public shelf</span>' +
+          '<label class="tick"><input type="checkbox" id="shareIn"' + (e.shared ? " checked" : "") +
+            "> Show this game</label>" +
+          (e.review
+            ? '<label class="tick"><input type="checkbox" id="shareRevIn"' + (e.shareReview ? " checked" : "") +
+              (e.shared ? "" : " disabled") + "> Include my review</label>"
+            : '<span class="pnote" style="margin:0">Write a review and you can share that too.</span>') +
+          '<span class="pnote" style="margin:0 0 0 auto">Notes, price and drop reasons stay private.</span>' +
+        "</div>"
+      : "") +
+
     '<div class="tabs" role="tablist">' +
       '<button class="tab' + (ui.tab === "journal" ? " on" : "") + '" data-tab="journal">Journal<i>' + e.notes.length + "</i></button>" +
       '<button class="tab' + (ui.tab === "review" ? " on" : "") + '" data-tab="review">Review' + (e.review ? "<i>●</i>" : "") + "</button>" +
       '<button class="tab' + (ui.tab === "history" ? " on" : "") + '" data-tab="history">History<i>' + e.history.length + "</i></button>" +
     '</div><div class="tabbody">' + tabBody + "</div>" +
 
+    "</div></div>";
+}
+
+/* ============================================================
+   6b. A PUBLIC SHELF — the one route that works signed out
+   Content here is written by other people, so everything goes through
+   esc() and nothing is trusted.
+   ============================================================ */
+let publicView = {handle:null, loading:false, data:null, error:null};
+
+/* Never call render() synchronously from here — viewPublic() runs *during*
+   render(), and a re-entrant render fights the caller for #view. */
+async function loadPublic(handle){
+  let next;
+  if (!cloudOn()){
+    next = {handle, loading:false, data:null, error:"Public profiles aren't switched on."};
+  } else {
+    try{
+      const res = await fetch(SUPABASE.url + "/rest/v1/public_shelves?select=*&handle=eq." +
+        encodeURIComponent(handle), {headers:{apikey:SUPABASE.anonKey}});
+      const rows = res.ok ? await res.json() : [];
+      next = rows.length
+        ? {handle, loading:false, data:rows[0], error:null}
+        : {handle, loading:false, data:null, error:"No public shelf at that name."};
+    } catch(err){
+      next = {handle, loading:false, data:null, error:"Couldn't reach the server."};
+    }
+  }
+  if (publicView.handle !== handle) return;   // navigated away mid-flight
+  publicView = next;
+  render();
+}
+
+function viewPublic(handle){
+  if (publicView.handle !== handle){
+    publicView = {handle, loading:true, data:null, error:null};
+    loadPublic(handle);                        // re-renders when it resolves
+  }
+
+  if (publicView.loading)
+    return '<div class="view"><div class="empty glass"><b>Loading…</b></div></div>';
+  if (publicView.error)
+    return '<div class="view"><header class="phead"><h1>Not <em>found</em></h1></header>' +
+      '<div class="empty glass"><b>' + esc(publicView.error) + "</b>" +
+      'Nothing to see at this address.</div>' +
+      '<div style="margin-top:20px"><button class="btn sm" data-go="tonight">Back to the app</button></div></div>';
+
+  const d = publicView.data;
+  const items = Array.isArray(d.items) ? d.items : [];
+  const done = items.filter(i => i.status === "completed").length;
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>' + esc(d.display_name || d.handle) + "<em>'s shelf</em></h1>" +
+      (d.bio ? '<p class="sub">' + esc(d.bio) + "</p>" : "") +
+      '<p class="sub" style="font-size:14px">' + items.length + (items.length === 1 ? " game shared" : " games shared") +
+        (done ? " · " + done + " finished" : "") + "</p></header>" +
+
+    (items.length
+      ? '<div class="shelf">' + items.map(i =>
+          '<div class="card pubcard" style="--h:' + hue(i.id || i.title) + '">' +
+            '<div class="spine"><b>' + esc(i.title) + "</b></div>" +
+            '<div class="card-m">' +
+              (i.score != null ? '<span class="num" style="color:var(--purple)">' + esc(i.score) + "/10</span>" : "") +
+              '<span class="pill ' + (STATUSES[i.status] ? i.status : "backlog") + '">' +
+                esc(STATUSES[i.status] || "Backlog") + "</span>" +
+            "</div>" +
+          "</div>").join("") + "</div>"
+      : '<div class="empty glass"><b>Nothing shared yet.</b>This shelf is public but empty.</div>') +
+
+    (items.filter(i => i.review).length
+      ? '<h2 class="pub-h2">Reviews</h2>' + items.filter(i => i.review).map(i =>
+          '<article class="panel glass pubreview"><h3>' + esc(i.title) +
+            (i.score != null ? ' <span class="num">' + esc(i.score) + "/10</span>" : "") + "</h3>" +
+            '<div class="review-read">' + i.review.split(/\n\s*\n/).map(x => "<p>" + esc(x) + "</p>").join("") + "</div>" +
+          "</article>").join("")
+      : "") +
+
+    '<div style="margin-top:28px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+      '<button class="btn sm" data-go="tonight">Open Backlogged</button>' +
+      '<a class="btn ghost sm" href="mailto:dramadanov@gmail.com?subject=' +
+        encodeURIComponent("Report a Backlogged profile: " + handle) + '">Report this profile</a>' +
     "</div></div>";
 }
 
@@ -1532,7 +2055,7 @@ function saveGame(id){
   e.price = price;
   // keep the intent pointing at something that exists
   if (!knownIntents(game(id)).includes(e.intent)) e.intent = knownIntents(game(id))[0] || "main";
-  save();
+  save(id);
   toast(editing ? "Saved." : "Added to the shelf.");
   location.hash = "#/game/" + id;
 }
@@ -1569,6 +2092,60 @@ function setStatus(id, next){
   toast(game(id).title + " → " + STATUSES[next]);
 }
 
+async function saveProfile(alsoPublish){
+  if (!signedIn()) return;
+  const val = id => ((document.getElementById(id) || {}).value || "").trim();
+  const handle = val("handleIn").toLowerCase();
+
+  if (alsoPublish && !/^[a-z0-9_-]{3,24}$/.test(handle))
+    return toast("Pick a handle first — 3–24 characters, letters, numbers, - and _.");
+
+  if (handle){
+    const chk = await api("/rest/v1/rpc/handle_available", {
+      method:"POST", body: JSON.stringify({want: handle})
+    });
+    if (chk.ok && (await chk.json()) === false) return toast("That handle is taken.");
+  }
+
+  const patch = {
+    handle: handle || null,
+    display_name: val("nameIn") || null,
+    bio: val("bioIn") || null
+  };
+  if (alsoPublish) patch.is_public = true;
+
+  const res = await api("/rest/v1/profiles?id=eq." + session.user.id, {
+    method:"PATCH", headers:{Prefer:"return=representation"}, body: JSON.stringify(patch)
+  });
+  if (!res.ok) return toast("Couldn't save the profile.");
+
+  await fetchProfile();
+  if (alsoPublish){
+    // make sure the server is publishing the library it has, not a stale one
+    pushPending = true; await flushPush();
+    const pub = await api("/rest/v1/rpc/publish_shelf", {method:"POST"});
+    toast(pub.ok ? "Your shelf is public." : "Saved, but publishing failed.");
+  } else {
+    toast("Profile saved.");
+  }
+  render();
+}
+
+async function unpublishProfile(){
+  if (!signedIn()) return;
+  const res = await api("/rest/v1/rpc/withdraw_shelf", {method:"POST"});
+  await fetchProfile();
+  toast(res.ok ? "Your shelf is private again." : "Couldn't withdraw it.");
+  render();
+}
+
+/* Sharing toggles only matter once a shelf is live, so keep it current. */
+async function republishIfPublic(){
+  if (!signedIn() || !profile || !profile.is_public) return;
+  pushPending = true; await flushPush();
+  await api("/rest/v1/rpc/publish_shelf", {method:"POST"});
+}
+
 function currentRoute(){
   const h = (location.hash || "#/tonight").replace(/^#\/?/, "");
   const [view, id] = h.split("/");
@@ -1590,16 +2167,23 @@ function render(){
   const r = currentRoute();
   const isGame = r.view === "game";
   const isForm = r.view === "add" || (r.view === "edit" && isCustom(r.id));
+  const isPub  = r.view === "u" && r.id;
   const overlaid = isGame || isForm;
-  const view = overlaid ? ui.view : (["tonight","shelf","stats"].includes(r.view) ? r.view : "tonight");
-  ui.view = view;
+  const view = isPub ? "u"
+             : overlaid ? ui.view
+             : (["tonight","shelf","stats"].includes(r.view) ? r.view : "tonight");
+  if (!isPub) ui.view = view;
 
   document.querySelectorAll(".rail-btn").forEach(b => b.classList.toggle("on", b.dataset.go === view));
 
   const box = document.getElementById("view");
   box.className = ui.animated === view ? "wrap" : "wrap animate";
   ui.animated = view;
-  box.innerHTML = view === "shelf" ? viewShelf() : view === "stats" ? viewStats() : viewTonight();
+  box.innerHTML = isPub ? viewPublic(decodeURIComponent(r.id))
+                : view === "shelf" ? viewShelf()
+                : view === "stats" ? viewStats()
+                : viewTonight();
+  paintSync();
 
   const ov = document.getElementById("overlay");
   const key = isForm ? r.view + ":" + (r.id || "") : isGame ? r.id : "";
@@ -1640,11 +2224,11 @@ document.addEventListener("click", ev => {
   if ((el = hit("data-start"))){ setStatus(el.dataset.start, "playing"); return openGame(el.dataset.start); }
   if ((el = hit("data-snooze"))){
     const e = entry(el.dataset.snooze);
-    e.snoozed = Date.now() + 7 * D; save();
+    e.snoozed = Date.now() + 7 * D; save(el.dataset.snooze);
     toast("Hidden for a week."); return render();
   }
   if ((el = hit("data-unsnooze"))){
-    entry(el.dataset.unsnooze).snoozed = 0; save();
+    entry(el.dataset.unsnooze).snoozed = 0; save(el.dataset.unsnooze);
     ui.showSnoozed = true; return render();
   }
 
@@ -1671,8 +2255,20 @@ document.addEventListener("click", ev => {
   if (hit("data-import"))        { document.getElementById("importFile")?.click(); return; }
   if (hit("data-showjson"))      { ui.showData = !ui.showData; return render(); }
 
+  /* accounts */
+  if (hit("data-magic")){
+    const v = (document.getElementById("emailIn").value || "").trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return toast("That doesn't look like an email address.");
+    return signInWithEmail(v);
+  }
+  if ((el = hit("data-oauth")))  { return signInWithProvider(el.dataset.oauth); }
+  if (hit("data-signout"))       { return signOut(); }
+  if (hit("data-saveprofile"))   { return saveProfile(false); }
+  if (hit("data-publish"))       { return saveProfile(true); }
+  if (hit("data-unpublish"))     { return unpublishProfile(); }
+
   /* detail */
-  if ((el = hit("data-intent"))){ entry(r.id).intent = el.dataset.intent; save(); return render(); }
+  if ((el = hit("data-intent"))){ entry(r.id).intent = el.dataset.intent; save(r.id); return render(); }
   if ((el = hit("data-status"))){ setStatus(r.id, el.dataset.status); return render(); }
   if ((el = hit("data-tab")))  { ui.tab = el.dataset.tab; ui.editingReview = false; return render(); }
 
@@ -1683,28 +2279,28 @@ document.addEventListener("click", ev => {
     const e = entry(r.id);
     e.hours = Math.round((e.hours + v) * 2) / 2;
     if (e.status === "backlog") setStatus(r.id, "playing");
-    save(); toast("Logged " + hrs(v) + "."); return render();
+    save(r.id); toast("Logged " + hrs(v) + "."); return render();
   }
-  if (hit("data-resethrs")){ entry(r.id).hours = 0; save(); return render(); }
+  if (hit("data-resethrs")){ entry(r.id).hours = 0; save(r.id); return render(); }
 
   if (hit("data-addnote")){
     const inp = document.getElementById("noteInput");
     const text = inp.value.trim();
     if (!text) { inp.focus(); return; }
     entry(r.id).notes.push({at:Date.now(), text});
-    save(); toast("Entry added."); return render();
+    save(r.id); toast("Entry added."); return render();
   }
   if ((el = hit("data-delnote"))){
     const e = entry(r.id), at = Number(el.dataset.delnote);
     e.notes = e.notes.filter(n => n.at !== at);
-    save(); return render();
+    save(r.id); return render();
   }
 
   if (hit("data-editreview")) { ui.editingReview = true;  return render(); }
   if (hit("data-cancelreview")){ ui.editingReview = false; return render(); }
   if (hit("data-savereview")){
     entry(r.id).review = document.getElementById("reviewInput").value.trim();
-    ui.editingReview = false; save(); toast("Review saved."); return render();
+    ui.editingReview = false; save(r.id); toast("Review saved."); return render();
   }
 
   /* click the scrim, not the sheet, to close */
@@ -1728,13 +2324,24 @@ document.addEventListener("change", ev => {
   const t = ev.target;
   if (t.id === "score"){
     entry(currentRoute().id).score = parseFloat(t.value);
-    save(); render();
+    save(currentRoute().id); render();
   }
   if (t.id === "weekly") render();
   if (t.id === "paidIn"){
     const v = parseFloat(t.value);
     entry(currentRoute().id).price = isNaN(v) || v < 0 ? null : v;
-    save(); render();
+    save(currentRoute().id); render();
+  }
+  if (t.id === "shareIn"){
+    const e = entry(currentRoute().id);
+    e.shared = t.checked;
+    if (!e.shared) e.shareReview = false;
+    if (e.shared) e.publicTitle = game(currentRoute().id).title;   // the projection reads this
+    save(currentRoute().id); republishIfPublic(); render();
+  }
+  if (t.id === "shareRevIn"){
+    entry(currentRoute().id).shareReview = t.checked;
+    save(currentRoute().id); republishIfPublic(); render();
   }
   if (t.id === "importFile" && t.files && t.files[0]){
     const reader = new FileReader();
@@ -1751,10 +2358,21 @@ document.addEventListener("keydown", ev => {
 
 window.addEventListener("hashchange", render);
 
-/* boot */
+/* A queued push must not be lost to a reload or a flaky connection. */
+window.addEventListener("online",  () => { if (pushPending) flushPush(); });
+window.addEventListener("offline", () => setSync("offline"));
+window.addEventListener("focus",   () => { if (pushPending) flushPush(); });
+
+/* boot
+   Order matters: the auth fragment has to be taken out of location.hash
+   before the router ever looks at it, or a fresh sign-in reads as a bad route. */
+captureAuthFragment();
+session = session || readSession();
 state = load();
 if (!location.hash) location.replace("#/tonight");
 render();
+if (authNotice){ toast(authNotice); authNotice = ""; }
+startCloud();
 </script>
 </body>
 </html>
