@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backlogged | Tackle the pile</title>
+<meta name="description" content="A backlog is a decision, not a list. Length, critical reception and your own verdict — enough to pick what to play tonight.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0e15'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='21' font-weight='600' fill='%23c084fc' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Backlogged — design tokens
+   Inherits the ground, glass and accent family of the writings
+   page (../index.html) so the two read as one site. Deliberately
+   single-theme dark: this is an app you open at night.
+   ============================================================ */
+:root{
+  --ink:#08080b;
+  --ink-2:#0e0e15;
+  --panel:rgba(25,26,40,.85);
+  --panel-2:rgba(36,37,55,.7);
+  --line:rgba(255,255,255,.11);
+  --line-2:rgba(255,255,255,.2);
+  --text:#e8e8f0;
+  --muted:#a2a2be;          /* neutral, biased violet toward the accents */
+  --faint:#8d8dab;          /* small uppercase labels live here — keep it above 4.5:1 */
+  --indigo:#818cf8;
+  --purple:#c084fc;
+  --pink:#f472b6;
+  --sky:#38bdf8;
+  /* semantic — score quality, kept off the accent hues on purpose */
+  --mighty:#34d399;
+  --strong:#a3e635;
+  --fair:#fbbf24;
+  --weak:#f87171;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI Variable','Segoe UI',Roboto,sans-serif;
+  --serif:'Playfair Display','Iowan Old Style','Hoefler Text',Charter,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,'Cascadia Mono',Consolas,monospace;
+  --r:14px;
+  --rail:76px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.55;
+  min-height:100vh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:rgba(129,140,248,.32)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.04);border-radius:10px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.3)}
+
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:6px}
+
+/* ---------- ambient background ---------- */
+.blobs{position:fixed;inset:0;overflow:hidden;z-index:-10;pointer-events:none}
+.blob{position:absolute;width:34rem;height:34rem;border-radius:50%;filter:blur(128px);opacity:.16;animation:blob 22s infinite ease-in-out}
+.blob.i{top:-8rem;left:-8rem;background:#6366f1}
+.blob.p{top:20%;right:-10rem;background:#a855f7;animation-delay:-7s}
+.blob.k{bottom:-12rem;left:25%;background:#ec4899;animation-delay:-14s}
+@keyframes blob{
+  0%,100%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(30px,-50px) scale(1.1)}
+  66%{transform:translate(-20px,20px) scale(.9)}
+}
+
+/* ---------- shared ---------- */
+.glass{
+  background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055), 0 2px 10px rgba(0,0,0,.35);
+}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:600}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600}
+p{margin:0}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+a{color:var(--indigo)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* ---------- app frame ---------- */
+.app{display:flex;min-height:100vh}
+
+.rail{
+  position:fixed;left:0;top:0;bottom:0;width:var(--rail);z-index:40;
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;
+  background:rgba(10,10,14,.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-right:1px solid var(--line);
+}
+.rail-mark{font-family:var(--serif);font-size:26px;line-height:1;color:var(--text);margin-bottom:18px;user-select:none}
+.rail-btn{
+  width:52px;padding:9px 0;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:5px;
+  color:var(--faint);transition:color .2s,background .2s;
+}
+.rail-btn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rail-btn span{font-size:9.5px;letter-spacing:.05em;font-weight:600}
+.rail-btn:hover{color:var(--muted);background:rgba(255,255,255,.04)}
+.rail-btn.on{color:var(--text);background:rgba(129,140,248,.14);box-shadow:inset 0 0 0 1px rgba(129,140,248,.28)}
+.rail-spacer{flex:1}
+
+.main{flex:1;margin-left:var(--rail);padding:40px 32px 96px;min-width:0}
+.wrap{max-width:1180px;margin:0 auto}
+/* Only animate when the view actually changes — re-rendering after a filter
+   click or a status change should not replay the entrance. */
+.animate > .view{animation:slideUp .5s cubic-bezier(.22,1,.36,1) both}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* ---------- page head ---------- */
+.phead{margin-bottom:32px}
+.phead h1{font-family:var(--serif);font-size:clamp(30px,4.4vw,46px);font-weight:600;letter-spacing:-.015em;line-height:1.08}
+.phead h1 em{font-style:italic;color:var(--purple)}
+.phead .sub{color:var(--muted);margin-top:10px;max-width:62ch;font-weight:300;font-size:16px}
+
+/* ---------- controls ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{
+  padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.07);
+  color:var(--muted);font-size:13.5px;font-weight:500;transition:all .22s;white-space:nowrap;
+}
+.chip:hover{background:rgba(255,255,255,.09);color:var(--text);border-color:var(--line-2)}
+.chip.on{background:rgba(129,140,248,.16);border-color:rgba(129,140,248,.5);color:#fff;box-shadow:0 0 20px rgba(99,102,241,.22)}
+.chip small{display:block;font-size:11px;color:var(--faint);font-weight:400;margin-top:1px}
+.chip.on small{color:rgba(255,255,255,.6)}
+
+.btn{
+  padding:10px 20px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:#fff;font-size:13.5px;font-weight:500;transition:all .22s;display:inline-flex;align-items:center;gap:8px;
+}
+.btn:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btn.primary{background:rgba(129,140,248,.18);border-color:rgba(129,140,248,.45)}
+.btn.primary:hover{background:rgba(129,140,248,.28);box-shadow:0 0 24px rgba(99,102,241,.3)}
+.btn.ghost{color:var(--muted)}
+.btn.ghost:hover{color:var(--text)}
+.btn.sm{padding:6px 13px;font-size:12.5px}
+
+.field{
+  width:100%;padding:10px 14px;border-radius:10px;background:rgba(0,0,0,.3);
+  border:1px solid var(--line);color:var(--text);font-size:14px;transition:border-color .2s;
+}
+.field:focus{outline:none;border-color:rgba(129,140,248,.55)}
+.field::placeholder{color:var(--faint)}
+textarea.field{resize:vertical;line-height:1.65}
+
+/* ---------- spine (procedural cover art) ---------- */
+.spine{
+  position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;flex-shrink:0;
+  container-type:inline-size;
+  background:
+    linear-gradient(150deg,
+      hsl(var(--h) 62% 46%) 0%,
+      hsl(var(--h) 48% 26%) 46%,
+      hsl(calc(var(--h) + 38) 40% 13%) 100%);
+  display:flex;align-items:flex-end;padding:12px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1), inset 0 -60px 60px -30px rgba(0,0,0,.75);
+}
+.spine::before{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 1px,transparent 1px 7px);
+  mix-blend-mode:overlay;
+}
+.spine::after{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:7px;
+  background:linear-gradient(90deg,rgba(0,0,0,.45),transparent);
+}
+.spine b{
+  position:relative;font-family:var(--serif);font-weight:600;line-height:1.15;
+  /* scales with the tile, so a 74px pick spine and a 112px hero spine both sit right */
+  font-size:clamp(9.5px,13.5cqw,17px);
+  color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.7);letter-spacing:-.01em;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* ---------- shelf grid ---------- */
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:22px}
+.card{text-align:left;display:flex;flex-direction:column;gap:10px;transition:transform .25s cubic-bezier(.22,1,.36,1)}
+.card:hover{transform:translateY(-5px)}
+.card:hover .spine{box-shadow:inset 0 0 0 1px rgba(255,255,255,.2), inset 0 -60px 60px -30px rgba(0,0,0,.75), 0 16px 40px -12px hsl(var(--h) 60% 30% / .8)}
+.card-t{font-size:13.5px;font-weight:600;line-height:1.3;color:var(--text)}
+.card-m{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+
+/* score badge */
+.oc{
+  display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:21px;padding:0 6px;
+  border-radius:6px;font-family:var(--mono);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:#08080b;
+}
+.oc.mighty{background:var(--mighty)} .oc.strong{background:var(--strong)}
+.oc.fair{background:var(--fair)}     .oc.weak{background:var(--weak)}
+.oc.none{background:rgba(255,255,255,.1);color:var(--faint)}
+
+/* status pill — state encoded in form as well as colour */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:.03em;padding:2px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+.pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.pill.backlog{color:var(--faint);border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.03)}
+.pill.playing{color:var(--sky);border-color:rgba(56,189,248,.35);background:rgba(56,189,248,.1)}
+.pill.completed{color:var(--mighty);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.1)}
+.pill.dropped{color:var(--weak);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)}
+
+/* ---------- tonight ---------- */
+.ask{padding:26px 28px;margin-bottom:26px}
+.ask h2{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:16px}
+.ask-row{display:flex;flex-wrap:wrap;gap:26px}
+.ask-col{flex:1;min-width:270px}
+.ask-col > .eyebrow{display:block;margin-bottom:10px}
+
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.pick{padding:20px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.pick::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(180deg,hsl(var(--h) 70% 60%),transparent)}
+.pick-top{display:flex;gap:15px}
+.pick .spine{width:74px}
+.pick-id{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.pick-id h3{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.2}
+.pick-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.rank{position:absolute;top:16px;right:18px;font-family:var(--serif);font-size:34px;line-height:1;color:rgba(255,255,255,.07);font-style:italic}
+.why{display:flex;flex-wrap:wrap;gap:7px}
+.why span{font-size:11.5px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+.why span.hi{color:var(--purple);border-color:rgba(192,132,252,.3);background:rgba(192,132,252,.1)}
+.pick-acts{display:flex;gap:9px;margin-top:auto;padding-top:4px}
+
+details.why-these{margin-top:24px;font-size:13px;color:var(--muted)}
+details.why-these summary{cursor:pointer;color:var(--faint);font-size:12.5px;width:fit-content}
+details.why-these summary:hover{color:var(--muted)}
+details.why-these .box{margin-top:12px;padding:16px 18px;line-height:1.7;max-width:70ch}
+details.why-these b{color:var(--text);font-weight:600}
+
+/* ---------- filters rail ---------- */
+.shelf-layout{display:grid;grid-template-columns:212px 1fr;gap:34px;align-items:start}
+/* grid items default to min-width:auto, which lets scroll containers push the page sideways */
+.shelf-layout > *{min-width:0}
+.filters{position:sticky;top:24px;display:flex;flex-direction:column;gap:22px}
+.fgroup > .eyebrow{display:block;margin-bottom:9px}
+.fopts{display:flex;flex-direction:column;gap:2px}
+.fopt{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;
+  padding:6px 10px;border-radius:8px;font-size:13px;color:var(--muted);transition:all .18s;
+}
+.fopt:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.fopt.on{background:rgba(129,140,248,.14);color:#fff}
+.fopt i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.fopt.on i{color:rgba(255,255,255,.55)}
+
+.shelf-bar{display:flex;gap:12px;align-items:center;margin-bottom:22px;flex-wrap:wrap}
+.shelf-bar .field{flex:1;min-width:180px}
+.count{font-size:13px;color:var(--faint);white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{padding:8px 11px;color:var(--faint);display:flex;transition:all .18s}
+.seg button svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.seg button:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.seg button.on{background:rgba(129,140,248,.18);color:#fff}
+
+/* ---------- table view ---------- */
+.tscroll{overflow-x:auto;border-radius:var(--r)}
+table.games{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
+table.games th{
+  text-align:left;padding:11px 14px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+table.games th.s{cursor:pointer}
+table.games th.s:hover{color:var(--muted)}
+table.games td{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:middle}
+table.games tbody tr{cursor:pointer;transition:background .16s}
+table.games tbody tr:hover{background:rgba(255,255,255,.045)}
+table.games .tt{font-weight:600;color:var(--text)}
+table.games .n{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;white-space:nowrap}
+
+.empty{padding:56px 24px;text-align:center;color:var(--faint)}
+.empty b{display:block;font-family:var(--serif);font-size:19px;color:var(--muted);margin-bottom:6px;font-weight:400;font-style:italic}
+
+/* ---------- stats ---------- */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:20px}
+.panel{padding:22px 24px}
+.panel > .eyebrow{display:block;margin-bottom:14px}
+.debt,.taste{grid-column:span 2}
+@media(max-width:820px){.debt,.taste{grid-column:span 1}}
+.debt-n{font-family:var(--serif);font-size:clamp(52px,9vw,86px);line-height:.95;font-weight:600;letter-spacing:-.03em;
+  background:linear-gradient(105deg,var(--indigo),var(--purple) 48%,var(--pink));
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+.debt-n small{font-family:var(--sans);font-size:17px;font-weight:400;letter-spacing:0;color:var(--muted);-webkit-text-fill-color:var(--muted);margin-left:12px}
+.debt-say{color:var(--muted);margin-top:12px;max-width:52ch;font-size:14.5px}
+.debt-say b{color:var(--text);font-weight:600}
+.rate{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:13.5px;color:var(--muted)}
+.rate input{width:74px;text-align:center;padding:6px 8px}
+
+.bar{display:flex;height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.05);margin-bottom:14px}
+.bar div{transition:width .5s cubic-bezier(.22,1,.36,1)}
+.legend{display:flex;flex-direction:column;gap:9px}
+.legend div{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted)}
+.legend i{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.legend b{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--text);font-variant-numeric:tabular-nums}
+
+.rows{display:flex;flex-direction:column;gap:11px}
+.row{display:flex;align-items:center;gap:12px;font-size:13.5px;width:100%;text-align:left;color:var(--muted);transition:color .18s}
+.row:hover{color:var(--text)}
+.row .rn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .rv{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--faint);white-space:nowrap}
+.meter{width:clamp(52px,24%,96px);height:6px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden;flex-shrink:0}
+.meter i{display:block;height:100%;border-radius:999px}
+
+.scatter{width:100%;height:auto;display:block;overflow:visible}
+.scatter .ax{stroke:rgba(255,255,255,.1);stroke-width:1}
+.scatter .gr{stroke:rgba(255,255,255,.045);stroke-width:1}
+.scatter .agree{stroke:rgba(255,255,255,.18);stroke-width:1;stroke-dasharray:3 4}
+.scatter text{font-family:var(--sans);font-size:9px;fill:var(--faint)}
+.scatter .lbl{font-size:9.5px;fill:var(--muted)}
+.scatter circle{cursor:pointer}
+
+/* ---------- detail overlay ---------- */
+.scrim{
+  position:fixed;inset:0;z-index:60;background:rgba(4,4,7,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  display:flex;align-items:flex-start;justify-content:center;padding:36px 24px;overflow-y:auto;animation:fadeIn .22s ease-out;
+}
+.sheet{
+  width:100%;max-width:940px;border-radius:20px;background:rgba(15,16,25,.94);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line-2);
+  box-shadow:0 40px 100px -20px rgba(0,0,0,.9);overflow:hidden;
+  animation:sheetIn .4s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes sheetIn{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
+.sheet-hero{position:relative;padding:28px 30px 24px;border-bottom:1px solid var(--line);overflow:hidden}
+.sheet-hero::before{
+  content:"";position:absolute;inset:0;opacity:.2;
+  background:radial-gradient(120% 150% at 8% 0%,hsl(var(--h) 70% 50%) 0%,transparent 62%);
+}
+.hero-in{position:relative;display:flex;gap:22px;align-items:flex-start}
+.hero-in .spine{width:112px}
+.hero-id{flex:1;min-width:0}
+.hero-id h2{font-family:var(--serif);font-size:clamp(24px,3.6vw,34px);font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.hero-sub{color:var(--muted);font-size:13.5px;margin-top:7px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.tag{font-size:11px;padding:3px 9px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--muted)}
+.x{position:absolute;top:18px;right:18px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .2s;z-index:2}
+.x:hover{background:rgba(255,255,255,.1);color:#fff;transform:rotate(90deg)}
+.x svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+
+/* the triptych: how long · what they thought · what you thought */
+.trip{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+@media(max-width:700px){.trip{grid-template-columns:1fr}}
+.trip > div{padding:22px 26px}
+.trip > div + div{border-left:1px solid var(--line)}
+@media(max-width:700px){.trip > div + div{border-left:none;border-top:1px solid var(--line)}}
+.trip .eyebrow{display:block;margin-bottom:11px}
+.big{font-family:var(--serif);font-size:40px;line-height:1;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.big small{font-family:var(--sans);font-size:14px;font-weight:400;color:var(--muted);margin-left:5px;letter-spacing:0}
+.trip .note{font-size:12px;color:var(--faint);margin-top:9px;line-height:1.5}
+
+.intents{display:flex;gap:5px;margin-top:13px}
+.intent{flex:1;padding:7px 4px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);text-align:center;transition:all .2s}
+.intent:hover{background:rgba(255,255,255,.08)}
+.intent.on{background:rgba(129,140,248,.18);border-color:rgba(129,140,248,.45)}
+.intent b{display:block;font-family:var(--mono);font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
+.intent span{display:block;font-size:9.5px;color:var(--faint);margin-top:2px;letter-spacing:.02em}
+.intent.on span{color:rgba(255,255,255,.6)}
+
+.oc-tier{display:flex;align-items:center;gap:10px;margin-top:4px}
+.tierword{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.quotes{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.quotes .quote{padding-left:11px;border-left:2px solid rgba(255,255,255,.15)}
+.quotes q{display:block;font-family:var(--serif);font-style:italic;font-size:13px;color:var(--muted);line-height:1.5}
+.quotes cite{display:block;font-style:normal;font-family:var(--sans);font-size:10.5px;color:var(--faint);margin-top:4px;letter-spacing:.04em}
+
+.slider{width:100%;margin-top:14px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+.slider::-webkit-slider-runnable-track{height:5px;border-radius:999px;background:linear-gradient(90deg,var(--indigo),var(--purple))}
+.slider::-moz-range-track{height:5px;border-radius:999px;background:linear-gradient(90deg,var(--indigo),var(--purple))}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;margin-top:-6px;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.slider::-moz-range-thumb{width:17px;height:17px;border:none;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+
+.statusbar{display:flex;gap:7px;padding:16px 26px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.statusbar .eyebrow{margin-right:4px}
+
+/* tabs */
+.tabs{display:flex;gap:2px;padding:0 26px;border-bottom:1px solid var(--line)}
+.tab{padding:13px 16px;font-size:13.5px;color:var(--faint);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;font-weight:500}
+.tab:hover{color:var(--muted)}
+.tab.on{color:#fff;border-bottom-color:var(--purple)}
+.tab i{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-left:5px}
+.tabbody{padding:24px 26px 28px}
+
+/* journal */
+.prog{margin-bottom:20px}
+.prog-top{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--muted);margin-bottom:8px}
+.prog-top b{font-family:var(--mono);color:var(--text);font-variant-numeric:tabular-nums}
+.prog-track{height:7px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.prog-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--sky),var(--indigo));transition:width .5s cubic-bezier(.22,1,.36,1)}
+.logrow{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.logrow input{width:66px;text-align:center;padding:6px 8px}
+
+.notes{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+.note-item{display:flex;gap:14px;padding-left:2px}
+.note-when{font-family:var(--mono);font-size:10.5px;color:var(--faint);width:76px;flex-shrink:0;padding-top:3px;letter-spacing:-.02em}
+.note-body{flex:1;min-width:0;font-size:14px;line-height:1.65;color:var(--text);white-space:pre-wrap;word-wrap:break-word;
+  border-left:1px solid var(--line);padding-left:14px}
+.note-del{color:var(--faint);font-size:11px;opacity:0;transition:opacity .18s;align-self:flex-start;padding-top:4px}
+.note-item:hover .note-del{opacity:1}
+.note-del:hover{color:var(--weak)}
+
+/* review — reuse the reading typography of the writings page */
+.review-read{font-family:var(--serif);font-size:17.5px;line-height:1.75;color:#d6d6e2;max-width:64ch}
+.review-read p{margin-bottom:1.1em}
+.review-read p:first-of-type::first-letter{font-size:3.1em;float:left;line-height:.82;padding:4px 10px 0 0;color:var(--purple)}
+.review-empty{font-family:var(--serif);font-style:italic;color:var(--faint);font-size:16px}
+.rev-acts{display:flex;gap:9px;margin-top:18px;align-items:center}
+
+/* history */
+.hist{display:flex;flex-direction:column;gap:0}
+.hist-item{display:flex;gap:14px;align-items:flex-start;padding:10px 0;font-size:13.5px;position:relative}
+.hist-item:not(:last-child)::after{content:"";position:absolute;left:5px;top:22px;bottom:-4px;width:1px;background:var(--line)}
+.hist-dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--faint);flex-shrink:0;margin-top:5px;background:var(--ink);z-index:1}
+.hist-dot.playing{border-color:var(--sky)} .hist-dot.completed{border-color:var(--mighty)} .hist-dot.dropped{border-color:var(--weak)}
+.hist-txt{flex:1;color:var(--text)}
+.hist-txt em{font-style:italic;color:var(--muted);display:block;font-size:13px;margin-top:2px}
+.hist-when{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex-shrink:0}
+
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);z-index:80;
+  padding:11px 22px;border-radius:999px;background:rgba(28,29,44,.96);border:1px solid var(--line-2);
+  font-size:13.5px;color:var(--text);box-shadow:0 16px 40px rgba(0,0,0,.6);transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .35s;opacity:0;pointer-events:none;
+}
+.toast.up{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ---------- responsive ---------- */
+@media(max-width:900px){
+  .shelf-layout{grid-template-columns:1fr;gap:24px}
+  .filters{position:static;flex-direction:row;flex-wrap:wrap;gap:20px}
+  .fgroup{min-width:132px}
+  .fopts{flex-direction:row;flex-wrap:wrap}
+}
+@media(max-width:640px){
+  :root{--rail:0px}
+  .main{padding:18px 16px 96px;margin-left:0;padding-bottom:104px}
+  .rail{
+    top:auto;left:0;right:0;bottom:0;width:auto;height:62px;flex-direction:row;justify-content:space-around;
+    padding:0 8px;border-right:none;border-top:1px solid var(--line);
+  }
+  .rail-mark,.rail-spacer{display:none}
+  .rail-btn{width:auto;flex:1;max-width:110px}
+  /* filters become swipeable rows so games start near the top of the screen */
+  /* nowrap matters: a wrapping column container lays items into max-content
+     columns instead of stretching them to the container width */
+  .filters{flex-direction:column;flex-wrap:nowrap;gap:14px}
+  .fgroup{min-width:0}
+  .fopts{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding-bottom:2px;min-width:0}
+  /* .fopt is width:100% in the sidebar layout — in a nowrap row that compounds */
+  .fopt{white-space:nowrap;flex:0 0 auto;width:auto;border:1px solid var(--line);border-radius:999px;padding:6px 13px}
+  .fopt i{margin-left:5px}
+  .shelf{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:16px}
+  .scrim{padding:0}
+  .sheet{border-radius:0;min-height:100vh;max-width:none}
+  .hero-in .spine{width:78px}
+  .tabs{padding:0 16px;overflow-x:auto}
+  .tabbody,.statusbar,.trip > div,.sheet-hero{padding-left:18px;padding-right:18px}
+  .toast{bottom:76px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .card:hover{transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="blobs" aria-hidden="true">
+  <div class="blob i"></div><div class="blob p"></div><div class="blob k"></div>
+</div>
+
+<div class="app">
+  <nav class="rail" aria-label="Sections">
+    <div class="rail-mark" aria-hidden="true">B</div>
+    <button class="rail-btn" data-go="tonight" aria-label="Tonight">
+      <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg><span>TONIGHT</span>
+    </button>
+    <button class="rail-btn" data-go="shelf" aria-label="The Shelf">
+      <svg viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 012-2h2v18H6a2 2 0 01-2-1.5zM8 21h4V3H8M12 21h3.6a1 1 0 001-.8l2.4-14a1 1 0 00-.8-1.2l-2.6-.4"/></svg><span>SHELF</span>
+    </button>
+    <button class="rail-btn" data-go="stats" aria-label="Reality Check">
+      <svg viewBox="0 0 24 24"><path d="M3 3v16.5A1.5 1.5 0 004.5 21H21M7 15l3.5-4 3 2.5L20 7"/></svg><span>REALITY</span>
+    </button>
+    <div class="rail-spacer"></div>
+  </nav>
+
+  <main class="main"><div class="wrap" id="view"></div></main>
+</div>
+
+<div id="overlay"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   1. SEED DATA
+   HowLongToBeat times (hours) and OpenCritic scores are baked in
+   as demo data — neither service is callable from a browser, so
+   everything flows through getGames() to keep a future proxy a
+   one-function change.
+   ============================================================ */
+const SEED = [
+  {id:"bg3",title:"Baldur's Gate 3",year:2023,dev:"Larian Studios",pub:"Larian Studios",genres:["RPG","Turn-Based","Fantasy"],platforms:["PC","PS5","Xbox"],hltb:{main:60,mainExtra:100,completionist:145},oc:{score:96,recommend:98},quotes:[["A staggering achievement — the deepest reactivity an RPG has ever attempted.","PC Gamer"],["Every wild idea you have, it has an answer for.","Eurogamer"]]},
+  {id:"eldenring",title:"Elden Ring",year:2022,dev:"FromSoftware",pub:"Bandai Namco",genres:["Action RPG","Open World"],platforms:["PC","PS5","Xbox"],hltb:{main:58,mainExtra:100,completionist:133},oc:{score:94,recommend:96},quotes:[["The open world finally justified — every horizon hides something authored.","IGN"]]},
+  {id:"persona5",title:"Persona 5 Royal",year:2019,dev:"Atlus",pub:"Sega",genres:["JRPG","Turn-Based","Social Sim"],platforms:["PC","PS5","Switch"],hltb:{main:103,mainExtra:133,completionist:190},oc:{score:94,recommend:98},quotes:[["Style as substance. A hundred hours that never sag.","Polygon"]]},
+  {id:"hades",title:"Hades",year:2020,dev:"Supergiant Games",pub:"Supergiant Games",genres:["Roguelike","Action","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:21,mainExtra:40,completionist:95},oc:{score:93,recommend:98},quotes:[["Failure has never been this narratively generous.","Rock Paper Shotgun"]]},
+  {id:"witcher3",title:"The Witcher 3: Wild Hunt",year:2015,dev:"CD Projekt Red",pub:"CD Projekt",genres:["RPG","Open World","Fantasy"],platforms:["PC","PS5","Switch"],hltb:{main:51,mainExtra:103,completionist:173},oc:{score:92,recommend:97},quotes:[["Side quests with better writing than most games' main stories.","GameSpot"]]},
+  {id:"disco",title:"Disco Elysium",year:2019,dev:"ZA/UM",pub:"ZA/UM",genres:["RPG","Narrative","Indie"],platforms:["PC","PS5","Switch"],hltb:{main:21,mainExtra:30,completionist:45},oc:{score:91,recommend:95},quotes:[["A detective story where the case you crack is yourself.","Waypoint"]]},
+  {id:"celeste",title:"Celeste",year:2018,dev:"Extremely OK Games",pub:"Extremely OK Games",genres:["Platformer","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:8,mainExtra:12.5,completionist:38},oc:{score:91,recommend:97},quotes:[["Difficulty as empathy. Nothing else plays quite this kindly.","Kotaku"]]},
+  {id:"inside",title:"Inside",year:2016,dev:"Playdead",pub:"Playdead",genres:["Puzzle","Platformer","Indie"],platforms:["PC","PS5","Switch"],hltb:{main:3.5,mainExtra:4,completionist:6},oc:{score:91,recommend:96},quotes:[["Not a word spoken, and you will not stop thinking about it.","Edge"]]},
+  {id:"sekiro",title:"Sekiro: Shadows Die Twice",year:2019,dev:"FromSoftware",pub:"Activision",genres:["Action","Souls-like"],platforms:["PC","PS5","Xbox"],hltb:{main:29,mainExtra:40,completionist:70},oc:{score:89,recommend:93},quotes:[["Combat as conversation — and it is not interested in your excuses.","VG247"]]},
+  {id:"obradinn",title:"Return of the Obra Dinn",year:2018,dev:"Lucas Pope",pub:"3909 LLC",genres:["Puzzle","Mystery","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:8,mainExtra:9.5,completionist:12},oc:{score:89,recommend:95},quotes:[["The rare deduction game that trusts you completely.","PC Gamer"]]},
+  {id:"davethediver",title:"Dave the Diver",year:2023,dev:"Mintrocket",pub:"Nexon",genres:["Adventure","Management","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:22,mainExtra:32,completionist:47},oc:{score:89,recommend:94},quotes:[["It should not work. It absolutely works.","Destructoid"]]},
+  {id:"slaythespire",title:"Slay the Spire",year:2019,dev:"Mega Crit",pub:"Mega Crit",genres:["Roguelike","Deckbuilder","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:27,mainExtra:62,completionist:155},oc:{score:89,recommend:94},quotes:[["The deckbuilder every other deckbuilder is measured against.","Rock Paper Shotgun"]]},
+  {id:"outerwilds",title:"Outer Wilds",year:2019,dev:"Mobius Digital",pub:"Annapurna",genres:["Adventure","Puzzle","Exploration"],platforms:["PC","PS5","Switch"],hltb:{main:15.5,mainExtra:22,completionist:32},oc:{score:88,recommend:93},quotes:[["Knowledge is the only upgrade, and it is the best one.","Eurogamer"]]},
+  {id:"hifirush",title:"Hi-Fi Rush",year:2023,dev:"Tango Gameworks",pub:"Bethesda",genres:["Action","Rhythm"],platforms:["PC","Xbox","PS5"],hltb:{main:12.5,mainExtra:16,completionist:24},oc:{score:88,recommend:96},quotes:[["Every single thing on screen is on the beat. Every one.","GamesRadar"]]},
+  {id:"titanfall2",title:"Titanfall 2",year:2016,dev:"Respawn",pub:"EA",genres:["Shooter","Action"],platforms:["PC","PS5","Xbox"],hltb:{main:6.5,mainExtra:9,completionist:16},oc:{score:88,recommend:94},quotes:[["Six hours that other shooters spend sixty failing to match.","IGN"]]},
+  {id:"cyberpunk",title:"Cyberpunk 2077",year:2020,dev:"CD Projekt Red",pub:"CD Projekt",genres:["RPG","Shooter","Open World"],platforms:["PC","PS5","Xbox"],hltb:{main:25,mainExtra:62,completionist:106},oc:{score:86,recommend:88},quotes:[["Night City is the best-realised place in the medium.","GameSpot"]]},
+  {id:"pentiment",title:"Pentiment",year:2022,dev:"Obsidian",pub:"Xbox Game Studios",genres:["Adventure","Narrative","RPG"],platforms:["PC","Xbox","Switch"],hltb:{main:17,mainExtra:22,completionist:30},oc:{score:86,recommend:91},quotes:[["An illuminated manuscript you get to argue with.","Polygon"]]},
+  {id:"chants",title:"Chants of Sennaar",year:2023,dev:"Rundisc",pub:"Focus Entertainment",genres:["Puzzle","Adventure","Indie"],platforms:["PC","Switch","PS5"],hltb:{main:10,mainExtra:12.5,completionist:17},oc:{score:83,recommend:89},quotes:[["You learn a language by needing it. Quietly brilliant.","Rock Paper Shotgun"]]}
+];
+
+/* First run leaves a lived-in shelf: things finished, things playing,
+   one honest abandonment, and a lot of good intentions. */
+const D = 864e5;
+const FIRST_RUN = [
+  ["eldenring",   {status:"completed",intent:"mainExtra",   added:800, started:790, finished:700, score:9.5, hours:96}],
+  ["hades",       {status:"completed",intent:"main",        added:900, started:880, finished:820, score:9,   hours:46}],
+  ["celeste",     {status:"completed",intent:"main",        added:950, started:930, finished:900, score:8.5, hours:14}],
+  ["slaythespire",{status:"completed",intent:"main",        added:1100,started:1080,finished:1000,score:8,   hours:60}],
+  ["disco",       {status:"playing",  intent:"main",        added:500, started:40,  hours:12}],
+  ["davethediver",{status:"playing",  intent:"main",        added:120, started:20,  hours:9}],
+  ["cyberpunk",   {status:"dropped",  intent:"main",        added:700, started:660, finished:640, hours:11,
+                   reason:"Bounced off the driving and never went back. Maybe after the expansion."}],
+  ["witcher3",    {status:"backlog",  intent:"completionist",added:1200}],
+  ["bg3",         {status:"backlog",  intent:"main",        added:420}],
+  ["hifirush",    {status:"backlog",  intent:"main",        added:340}],
+  ["obradinn",    {status:"backlog",  intent:"main",        added:610}],
+  ["outerwilds",  {status:"backlog",  intent:"main",        added:380}],
+  ["sekiro",      {status:"backlog",  intent:"main",        added:450}],
+  ["inside",      {status:"backlog",  intent:"main",        added:300}],
+  ["persona5",    {status:"backlog",  intent:"main",        added:260}],
+  ["pentiment",   {status:"backlog",  intent:"main",        added:200}],
+  ["chants",      {status:"backlog",  intent:"main",        added:90}],
+  ["titanfall2",  {status:"backlog",  intent:"main",        added:1000}]
+];
+
+/* ============================================================
+   2. STORE
+   ============================================================ */
+const KEY = "backlog:v1";
+const INTENTS = {main:"Main", mainExtra:"Main + Extras", completionist:"Completionist"};
+const STATUSES = {backlog:"Backlog", playing:"Playing", completed:"Completed", dropped:"Dropped"};
+
+let state, ui = {view:"tonight", appetite:null, mood:null, mode:"grid", tab:"journal",
+                 q:"", status:"all", length:"all", sort:"added", editingReview:false};
+
+function getGames(){ return SEED; }                       // ← future API swaps in here
+function game(id){ return SEED.find(g => g.id === id); }
+
+function blankEntry(){
+  return {status:"backlog", intent:"main", added:Date.now(), started:null, finished:null,
+          score:null, hours:0, reason:"", notes:[], review:"", snoozed:0, history:[]};
+}
+
+function firstRun(){
+  const now = Date.now(), entries = {};
+  for (const [id, s] of FIRST_RUN){
+    const e = blankEntry();
+    e.status = s.status; e.intent = s.intent;
+    e.added = now - s.added * D;
+    e.started = s.started != null ? now - s.started * D : null;
+    e.finished = s.finished != null ? now - s.finished * D : null;
+    e.score = s.score ?? null; e.hours = s.hours ?? 0; e.reason = s.reason || "";
+    e.history = [{at:e.added, status:"backlog", note:""}];
+    if (e.started)  e.history.push({at:e.started,  status:"playing",  note:""});
+    if (e.finished) e.history.push({at:e.finished, status:s.status,   note:s.reason || ""});
+    entries[id] = e;
+  }
+  entries.disco.notes = [
+    {at:now - 38*D, text:"Failed a Composure check in the first ten minutes and my tie started talking to me. Keeping this save."},
+    {at:now - 12*D, text:"Kim Kitsuragi is the best companion character in the medium and it is not close."}
+  ];
+  entries.eldenring.review =
+    "I put ninety-six hours into this and the moment I keep returning to is not a boss.\n\n" +
+    "It is the first time I crested the hill out of Limgrave at night and saw the golden tree just sitting there on the horizon, enormous and indifferent, with no marker, no quest, no voice telling me it mattered. I stood still for a while. Then I went the other way, because I could.\n\n" +
+    "That is the whole trick. Every other open world hands you a map studded with icons and calls it freedom. This one hands you a horizon and trusts that curiosity is enough. It nearly always is.";
+  entries.hades.review =
+    "The genius of it is that dying is the story.\n\n" +
+    "Every other roguelike treats a failed run as lost time. Here the failure is the delivery mechanism — you crawl back up out of the Styx and someone has something new to say to you about it. Two hundred escape attempts and I never once resented the walk back to the courtyard.";
+  return {entries, prefs:{weekly:8}};
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if (raw){
+      const p = JSON.parse(raw);
+      if (p && p.entries) return p;
+    }
+  } catch(err){ /* corrupt or unavailable storage — fall through to a clean shelf */ }
+  // Persist the seed straight away: "added" dates are generated relative to now,
+  // so without this they'd silently reset on every visit and nothing would age.
+  const fresh = firstRun();
+  try{ localStorage.setItem(KEY, JSON.stringify(fresh)); } catch(err){ /* private mode — run in memory */ }
+  return fresh;
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch(err){ toast("Couldn't save — storage is full or blocked."); }
+}
+function entry(id){
+  if (!state.entries[id]) state.entries[id] = blankEntry();
+  return state.entries[id];
+}
+
+/* ============================================================
+   3. HELPERS
+   ============================================================ */
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+const days = ts => Math.max(0, Math.floor((Date.now() - ts) / D));
+const hrs  = h => (h % 1 === 0 ? h : h.toFixed(1)) + "h";
+
+function hue(id){                                  // stable colour per title
+  let n = 0;
+  for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
+  return n % 360;
+}
+function tier(s){ return s >= 90 ? "mighty" : s >= 80 ? "strong" : s >= 70 ? "fair" : "weak"; }
+function tierWord(s){ return s >= 90 ? "Mighty" : s >= 80 ? "Strong" : s >= 70 ? "Fair" : "Weak"; }
+function lengthOf(g, e){ return g.hltb[e.intent] || g.hltb.main; }
+function remaining(g, e){ return Math.max(0, lengthOf(g, e) - e.hours); }
+function bucket(h){ return h < 10 ? "short" : h < 25 ? "mid" : h < 60 ? "long" : "epic"; }
+
+function whenText(ts){
+  const d = days(ts);
+  if (d === 0) return "today";
+  if (d === 1) return "yesterday";
+  if (d < 30)  return d + "d ago";
+  if (d < 365) return Math.round(d / 30) + "mo ago";
+  const y = (d / 365).toFixed(1).replace(/\.0$/, "");
+  return y + "y ago";
+}
+function dateText(ts){
+  return new Date(ts).toLocaleDateString(undefined, {day:"numeric", month:"short", year:"numeric"});
+}
+
+/* average of your own scores, by genre — feeds the Tonight ranking */
+function affinity(){
+  const acc = {};
+  for (const g of getGames()){
+    const e = state.entries[g.id];
+    if (!e || e.score == null) continue;
+    for (const gen of g.genres) (acc[gen] = acc[gen] || []).push(e.score);
+  }
+  const out = {};
+  for (const k in acc) out[k] = acc[k].reduce((a,b) => a + b, 0) / acc[k].length;
+  return out;
+}
+function affinityFor(g, aff){
+  const hits = g.genres.map(x => aff[x]).filter(x => x != null);
+  return hits.length ? hits.reduce((a,b) => a + b, 0) / hits.length : null;
+}
+
+function spine(g, cls){
+  return '<div class="spine ' + (cls || "") + '" style="--h:' + hue(g.id) + '"><b>' + esc(g.title) + "</b></div>";
+}
+function ocBadge(g){
+  return '<span class="oc ' + tier(g.oc.score) + '">' + g.oc.score + "</span>";
+}
+
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("up");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("up"), 2400);
+}
+
+/* ============================================================
+   4. TONIGHT — the ranking
+   ============================================================ */
+const APPETITES = {
+  short:   {label:"A couple of hours", hint:"~2h tonight",     target:8},
+  evening: {label:"An evening",        hint:"~5h tonight",     target:18},
+  weekend: {label:"A long weekend",    hint:"~15h to give",    target:55}
+};
+const MOODS = {
+  great:  {label:"Short and great",  hint:"quality per hour"},
+  sink:   {label:"Something to sink into", hint:"the long haul"},
+  finish: {label:"Finish what I started",  hint:"already playing"}
+};
+const WEIGHTS = {fit:.40, critical:.25, neglect:.20, taste:.15};
+
+function candidates(){
+  const app = APPETITES[ui.appetite];
+  if (!app) return [];
+  const aff = affinity(), now = Date.now();
+  const pool = getGames().filter(g => {
+    const e = entry(g.id);
+    if (e.snoozed > now) return false;
+    return ui.mood === "finish" ? e.status === "playing"
+                                : e.status === "backlog" || e.status === "playing";
+  });
+
+  const scored = pool.map(g => {
+    const e = entry(g.id);
+    const left = remaining(g, e) || lengthOf(g, e);
+    let target = app.target;
+    if (ui.mood === "great") target *= .7;
+    if (ui.mood === "sink")  target *= 2.2;
+
+    // closeness on a log scale: being 2x off matters far less than 20x off
+    const fit = Math.max(0, 1 - Math.abs(Math.log(left / target)) / Math.log(7));
+    const critical = g.oc.score / 100;
+    const neglect  = Math.min(1, days(e.added) / 500);
+    const a = affinityFor(g, aff);
+    const taste = a != null ? a / 10 : .7;
+
+    let total = WEIGHTS.fit*fit + WEIGHTS.critical*critical + WEIGHTS.neglect*neglect + WEIGHTS.taste*taste;
+    if (ui.mood === "great")  total += critical * .12;
+    if (ui.mood === "finish") total += .1;
+
+    const why = [];
+    if (fit > .72)      why.push({t:hrs(left) + " left — fits " + app.label.toLowerCase(), hi:true});
+    else if (fit > .45) why.push({t:hrs(left) + " left", hi:false});
+    else                why.push({t:hrs(left) + " — a stretch for tonight", hi:false});
+    if (critical >= .9) why.push({t:g.oc.score + " on OpenCritic", hi:true});
+    else                why.push({t:g.oc.score + " on OpenCritic", hi:false});
+    if (neglect > .6)   why.push({t:"Sat " + days(e.added) + " days untouched", hi:true});
+    if (a != null && a >= 8.5) why.push({t:"You rate " + g.genres[0] + " " + a.toFixed(1) + " on average", hi:true});
+    if (e.status === "playing") why.push({t:"Already " + Math.round(e.hours / lengthOf(g,e) * 100) + "% in", hi:true});
+
+    return {g, e, total, why};
+  });
+
+  scored.sort((a, b) => b.total - a.total);
+  return scored.slice(0, 3);
+}
+
+function viewTonight(){
+  const picked = ui.appetite != null;
+  const chips = k => Object.entries(k === "a" ? APPETITES : MOODS).map(([id, o]) =>
+    '<button class="chip' + ((k === "a" ? ui.appetite : ui.mood) === id ? " on" : "") +
+    '" data-' + (k === "a" ? "app" : "mood") + '="' + id + '">' + o.label +
+    "<small>" + o.hint + "</small></button>").join("");
+
+  let body;
+  if (!picked){
+    body = '<div class="empty glass"><b>Pick an appetite and I\'ll narrow eighteen games down to three.</b>' +
+           "The pile isn't the problem. Choosing is.</div>";
+  } else {
+    const list = candidates();
+    body = list.length
+      ? '<div class="picks">' + list.map((c, i) => {
+          const g = c.g, e = c.e;
+          return '<article class="pick glass" style="--h:' + hue(g.id) + '">' +
+            '<div class="rank" aria-hidden="true">' + ["I","II","III"][i] + "</div>" +
+            '<div class="pick-top">' + spine(g) +
+              '<div class="pick-id"><h3>' + esc(g.title) + "</h3>" +
+                '<div class="pick-meta">' + ocBadge(g) + "<span>" + esc(g.dev) + " · " + g.year + "</span></div>" +
+                '<div class="pick-meta"><span>' + esc(g.genres.slice(0,2).join(" · ")) + "</span></div>" +
+              "</div></div>" +
+            '<div class="why">' + c.why.map(w => '<span class="' + (w.hi ? "hi" : "") + '">' + esc(w.t) + "</span>").join("") + "</div>" +
+            '<div class="pick-acts">' +
+              '<button class="btn primary sm" data-start="' + g.id + '">' +
+                '<svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>' +
+                (e.status === "playing" ? "Keep going" : "Start playing") + "</button>" +
+              '<button class="btn ghost sm" data-snooze="' + g.id + '">Not tonight</button>' +
+              '<button class="btn ghost sm" data-open="' + g.id + '">Details</button>' +
+            "</div></article>";
+        }).join("") + "</div>"
+      : '<div class="empty glass"><b>Nothing left to suggest.</b>' +
+        (ui.mood === "finish" ? "You have nothing in progress. Start something."
+                              : "Everything is snoozed or finished. Genuinely — go outside.") + "</div>";
+  }
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>What are you playing <em>tonight</em>?</h1>' +
+    '<p class="sub">Answer one question and the pile becomes a shortlist. Ranked on how well the game fits the time you actually have, what critics made of it, how long it has been waiting, and what you tend to like.</p></header>' +
+    '<section class="ask glass"><h2>How much time have you got?</h2>' +
+      '<div class="ask-row">' +
+        '<div class="ask-col"><span class="eyebrow">Tonight</span><div class="chips">' + chips("a") + "</div></div>" +
+        '<div class="ask-col"><span class="eyebrow">Mood — optional</span><div class="chips">' + chips("m") + "</div></div>" +
+      "</div></section>" +
+    body +
+    (picked ? '<details class="why-these"><summary>Why these three?</summary><div class="box glass">' +
+      "Each candidate scores on four things, weighted: <b>time fit " + (WEIGHTS.fit*100) + "%</b> — how close its remaining length sits to what you said you had; " +
+      "<b>critical reception " + (WEIGHTS.critical*100) + "%</b> — the OpenCritic score; " +
+      "<b>neglect " + (WEIGHTS.neglect*100) + "%</b> — how long it has sat unplayed, so the shelf rotates instead of showing you the same three forever; " +
+      "and <b>your taste " + (WEIGHTS.taste*100) + "%</b> — the average score you've given games in the same genres. " +
+      "Remaining length uses <em>your</em> chosen intent per game, not the completionist figure. " +
+      "<b>Not tonight</b> hides a game for a week.</div></details>" : "") +
+    "</div>";
+}
+
+/* ============================================================
+   5. SHELF
+   ============================================================ */
+const LENGTHS = {all:"Any length", short:"Under 10h", mid:"10 – 25h", long:"25 – 60h", epic:"60h and up"};
+const SORTS   = {added:"Recently added", neglect:"Longest waiting", length:"Shortest first",
+                 oc:"OpenCritic", mine:"My score", title:"A – Z"};
+
+function shelfList(){
+  const q = ui.q.trim().toLowerCase();
+  let list = getGames().map(g => ({g, e:entry(g.id)}));
+
+  if (ui.status !== "all") list = list.filter(x => x.e.status === ui.status);
+  if (ui.length !== "all") list = list.filter(x => bucket(lengthOf(x.g, x.e)) === ui.length);
+  if (q) list = list.filter(x =>
+    (x.g.title + " " + x.g.dev + " " + x.g.genres.join(" ")).toLowerCase().includes(q));
+
+  const by = {
+    added:   (a,b) => b.e.added - a.e.added,
+    neglect: (a,b) => a.e.added - b.e.added,
+    length:  (a,b) => lengthOf(a.g,a.e) - lengthOf(b.g,b.e),
+    oc:      (a,b) => b.g.oc.score - a.g.oc.score,
+    mine:    (a,b) => (b.e.score ?? -1) - (a.e.score ?? -1),
+    title:   (a,b) => a.g.title.localeCompare(b.g.title)
+  };
+  return list.sort(by[ui.sort] || by.added);
+}
+
+function countBy(fn){
+  return getGames().filter(g => fn(g, entry(g.id))).length;
+}
+
+/* Results are built separately from the chrome so typing in the search box
+   can refresh them without tearing out the focused input. */
+function shelfBody(list){
+  if (!list.length) return '<div class="empty glass"><b>Nothing matches.</b>Loosen a filter.</div>';
+
+  if (ui.mode === "grid"){
+    return '<div class="shelf">' + list.map(({g, e}) =>
+      '<button class="card" data-open="' + g.id + '" style="--h:' + hue(g.id) + '">' +
+        spine(g) +                                   /* the title lives on the spine */
+        '<div class="card-m">' + ocBadge(g) +
+          '<span class="num">' + hrs(lengthOf(g, e)) + "</span>" +
+          (e.score != null ? '<span class="num" style="color:var(--purple)">you ' + e.score + "</span>" : "") +
+          '<span class="pill ' + e.status + '">' + STATUSES[e.status] + "</span>" +
+        "</div></button>").join("") + "</div>";
+  }
+
+  return '<div class="tscroll glass"><table class="games"><thead><tr>' +
+    "<th>Game</th><th>Status</th><th>Intent</th>" +
+    '<th class="n" style="text-align:right">Length</th><th class="n" style="text-align:right">Left</th>' +
+    '<th class="n" style="text-align:right">OpenCritic</th><th class="n" style="text-align:right">You</th><th class="n" style="text-align:right">Added</th>' +
+    "</tr></thead><tbody>" + list.map(({g, e}) =>
+      '<tr data-open="' + g.id + '"><td class="tt">' + esc(g.title) +
+        '<div style="font-size:11.5px;color:var(--faint);font-weight:400">' + esc(g.dev) + " · " + g.year + "</div></td>" +
+      '<td><span class="pill ' + e.status + '">' + STATUSES[e.status] + "</span></td>" +
+      '<td style="color:var(--muted);font-size:12.5px">' + INTENTS[e.intent] + "</td>" +
+      '<td class="n">' + hrs(lengthOf(g, e)) + "</td>" +
+      '<td class="n">' + (e.status === "completed" ? "—" : hrs(remaining(g, e))) + "</td>" +
+      '<td class="n">' + ocBadge(g) + "</td>" +
+      '<td class="n" style="color:var(--purple)">' + (e.score != null ? e.score : "—") + "</td>" +
+      '<td class="n">' + whenText(e.added) + "</td></tr>").join("") +
+    "</tbody></table></div>";
+}
+
+function renderShelfResults(){
+  const box = document.getElementById("results");
+  if (!box) return;
+  const list = shelfList();
+  box.innerHTML = shelfBody(list);
+  const c = document.getElementById("count");
+  if (c) c.textContent = list.length + " shown";
+}
+
+function viewShelf(){
+  const list = shelfList();
+
+  const statusOpts = ['<button class="fopt' + (ui.status === "all" ? " on" : "") +
+    '" data-f="status" data-v="all">Everything <i>' + getGames().length + "</i></button>"]
+    .concat(Object.entries(STATUSES).map(([k, label]) =>
+      '<button class="fopt' + (ui.status === k ? " on" : "") + '" data-f="status" data-v="' + k + '">' +
+      label + " <i>" + countBy((g,e) => e.status === k) + "</i></button>")).join("");
+
+  const lengthOpts = Object.entries(LENGTHS).map(([k, label]) =>
+    '<button class="fopt' + (ui.length === k ? " on" : "") + '" data-f="length" data-v="' + k + '">' +
+    label + (k === "all" ? "" : " <i>" + countBy((g,e) => bucket(lengthOf(g,e)) === k) + "</i>") + "</button>").join("");
+
+  const sortOpts = Object.entries(SORTS).map(([k, label]) =>
+    '<button class="fopt' + (ui.sort === k ? " on" : "") + '" data-f="sort" data-v="' + k + '">' + label + "</button>").join("");
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>The <em>Shelf</em></h1>' +
+    '<p class="sub">Eighteen games, ' + Math.round(getGames().reduce((s,g) => s + remaining(g, entry(g.id)), 0)) +
+    ' hours still on them. Length is HowLongToBeat for the intent you set on each game — not the completionist number, unless that is genuinely what you mean to do.</p></header>' +
+    '<div class="shelf-layout">' +
+      '<aside class="filters">' +
+        '<div class="fgroup"><span class="eyebrow">Status</span><div class="fopts">' + statusOpts + "</div></div>" +
+        '<div class="fgroup"><span class="eyebrow">Length</span><div class="fopts">' + lengthOpts + "</div></div>" +
+        '<div class="fgroup"><span class="eyebrow">Sort</span><div class="fopts">' + sortOpts + "</div></div>" +
+      "</aside><div>" +
+        '<div class="shelf-bar">' +
+          '<input class="field" id="q" type="search" placeholder="Search title, studio or genre…" value="' + esc(ui.q) + '" aria-label="Search games">' +
+          '<span class="count num" id="count">' + list.length + " shown</span>" +
+          '<div class="seg" role="group" aria-label="View mode">' +
+            '<button class="' + (ui.mode === "grid" ? "on" : "") + '" data-mode="grid" aria-label="Grid view"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></button>' +
+            '<button class="' + (ui.mode === "table" ? "on" : "") + '" data-mode="table" aria-label="Table view"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>' +
+          "</div></div>" +
+        '<div id="results">' + shelfBody(list) + "</div>" +
+      "</div></div></div>";
+}
+
+/* ============================================================
+   6. REALITY CHECK
+   ============================================================ */
+function viewStats(){
+  const games = getGames();
+  const totals = {backlog:0, playing:0, completed:0, dropped:0};
+  let debt = 0, rated = [];
+
+  for (const g of games){
+    const e = entry(g.id);
+    const len = lengthOf(g, e);
+    if (e.status === "completed" || e.status === "dropped") totals[e.status] += e.hours || len;
+    else { totals[e.status] += len; debt += remaining(g, e); }
+    if (e.score != null) rated.push({g, e});
+  }
+
+  const weekly = state.prefs.weekly || 8;
+  const months = debt / (weekly * 4.345);
+  const monthsTxt = months >= 12 ? (months / 12).toFixed(1) + " years" : months.toFixed(1) + " months";
+  const done = games.filter(g => entry(g.id).status === "completed").length;
+  const dropped = games.filter(g => entry(g.id).status === "dropped").length;
+  const touched = done + dropped;
+  const sumAll = Object.values(totals).reduce((a,b) => a + b, 0) || 1;
+
+  const COLORS = {backlog:"var(--faint)", playing:"var(--sky)", completed:"var(--mighty)", dropped:"var(--weak)"};
+  const bar = Object.entries(totals).map(([k, v]) =>
+    '<div style="width:' + (v / sumAll * 100) + '%;background:' + COLORS[k] + '"></div>').join("");
+  const legend = Object.entries(totals).map(([k, v]) =>
+    '<div><i style="background:' + COLORS[k] + '"></i>' + STATUSES[k] + "<b>" + Math.round(v) + "h</b></div>").join("");
+
+  /* dust — backlog games, never started, longest waiting */
+  const dust = games.map(g => ({g, e:entry(g.id)}))
+    .filter(x => x.e.status === "backlog" && !x.e.hours)
+    .sort((a,b) => a.e.added - b.e.added).slice(0, 6);
+  const maxDust = dust.length ? days(dust[0].e.added) : 1;
+
+  /* taste — your score against theirs */
+  const W = 340, H = 250, P = 42;
+  const px = v => P + (v - 5) / 5 * (W - P - 16);
+  const py = v => H - P - (v - 5) / 5 * (H - P - 18);
+  const dots = rated.map(({g, e}) =>
+    '<circle cx="' + px(g.oc.score/10).toFixed(1) + '" cy="' + py(e.score).toFixed(1) +
+    '" r="6" fill="hsl(' + hue(g.id) + ' 65% 58%)" fill-opacity=".85" stroke="rgba(255,255,255,.35)" data-open="' + g.id + '"><title>' +
+    esc(g.title) + " — you " + e.score + ", critics " + (g.oc.score/10).toFixed(1) + "</title></circle>").join("");
+  const gridlines = [6,7,8,9,10].map(v =>
+    '<line class="gr" x1="' + px(v) + '" y1="' + (H-P) + '" x2="' + px(v) + '" y2="16"/>' +
+    '<line class="gr" x1="' + P + '" y1="' + py(v) + '" x2="' + (W-16) + '" y2="' + py(v) + '"/>').join("");
+  const ticks = [6,7,8,9,10].map(v =>
+    '<text x="' + px(v) + '" y="' + (H-P+16) + '" text-anchor="middle">' + v + "</text>" +
+    '<text x="' + (P-10) + '" y="' + (py(v)+3.5) + '" text-anchor="end">' + v + "</text>").join("");
+
+  /* genre affinity */
+  const aff = affinity();
+  const affRows = Object.entries(aff).sort((a,b) => b[1] - a[1]).slice(0, 6).map(([k, v]) =>
+    '<div class="row"><span class="rn">' + esc(k) + '</span>' +
+    '<span class="meter"><i style="width:' + (v/10*100) + '%;background:linear-gradient(90deg,var(--indigo),var(--purple))"></i></span>' +
+    '<span class="rv">' + v.toFixed(1) + "</span></div>").join("");
+
+  return '<div class="view">' +
+    '<header class="phead"><h1>Reality <em>check</em></h1>' +
+    '<p class="sub">Honest, not cruel. A backlog you can see the shape of is a backlog you can make decisions about.</p></header>' +
+    '<div class="stat-grid">' +
+
+      '<section class="panel glass debt"><span class="eyebrow">Backlog debt</span>' +
+        '<div class="debt-n">' + monthsTxt.split(" ")[0] + "<small>" + monthsTxt.split(" ")[1] + " to clear</small></div>" +
+        '<p class="debt-say"><b>' + Math.round(debt) + " hours</b> left across " +
+          countBy((g,e) => e.status === "backlog" || e.status === "playing") + " unfinished games, at " + weekly + "h a week. " +
+          "Change an intent from Completionist to Main on any game and this number drops immediately — the pile's size is a choice about how you play, not a fact about what you own.</p>" +
+        '<div class="rate"><label for="weekly">I realistically play</label>' +
+          '<input class="field num" id="weekly" type="number" min="1" max="80" value="' + weekly + '"> hours a week</div>' +
+      "</section>" +
+
+      '<section class="panel glass"><span class="eyebrow">Where the hours sit</span>' +
+        '<div class="bar">' + bar + '</div><div class="legend">' + legend + "</div></section>" +
+
+      '<section class="panel glass"><span class="eyebrow">Follow-through</span>' +
+        '<div class="rows">' +
+          '<div class="row"><span class="rn">Finished</span><span class="meter"><i style="width:' + (done/games.length*100) + '%;background:var(--mighty)"></i></span><span class="rv">' + done + " of " + games.length + "</span></div>" +
+          '<div class="row"><span class="rn">Put down</span><span class="meter"><i style="width:' + (dropped/games.length*100) + '%;background:var(--weak)"></i></span><span class="rv">' + dropped + "</span></div>" +
+          '<div class="row"><span class="rn">Never opened</span><span class="meter"><i style="width:' + (countBy((g,e)=>!e.hours)/games.length*100) + '%;background:var(--faint)"></i></span><span class="rv">' + countBy((g,e) => !e.hours) + "</span></div>" +
+        "</div>" +
+        '<p style="font-size:12.5px;color:var(--faint);margin-top:16px;line-height:1.6">A drop rate of zero is not discipline. It means you are finishing things you stopped enjoying.</p>' +
+      "</section>" +
+
+      '<section class="panel glass taste"><span class="eyebrow">You vs. the critics</span>' +
+        (rated.length
+          ? '<svg class="scatter" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Your score plotted against OpenCritic score">' +
+            gridlines +
+            '<line class="agree" x1="' + px(5) + '" y1="' + py(5) + '" x2="' + px(10) + '" y2="' + py(10) + '"/>' +
+            '<line class="ax" x1="' + P + '" y1="' + (H-P) + '" x2="' + (W-12) + '" y2="' + (H-P) + '"/>' +
+            '<line class="ax" x1="' + P + '" y1="' + (H-P) + '" x2="' + P + '" y2="12"/>' +
+            ticks + dots +
+            '<text class="lbl" x="' + ((W+P)/2) + '" y="' + (H-8) + '" text-anchor="middle">OpenCritic score</text>' +
+            '<text class="lbl" x="-' + ((H-P)/2+8) + '" y="13" text-anchor="middle" transform="rotate(-90)">Your score</text>' +
+            "</svg>" +
+            '<p style="font-size:12.5px;color:var(--faint);margin-top:10px;line-height:1.6">Dashed line is agreement. Above it you liked it more than they did; below, less. ' + rated.length + " rated so far.</p>"
+          : '<p style="color:var(--faint);font-size:13.5px">Rate a few finished games and your taste starts showing up here.</p>') +
+      "</section>" +
+
+      '<section class="panel glass"><span class="eyebrow">Gathering dust</span>' +
+        (dust.length ? '<div class="rows">' + dust.map(({g, e}) =>
+          '<button class="row" data-open="' + g.id + '"><span class="rn">' + esc(g.title) + "</span>" +
+          '<span class="meter"><i style="width:' + (days(e.added)/maxDust*100) + '%;background:linear-gradient(90deg,var(--faint),var(--pink))"></i></span>' +
+          '<span class="rv">' + days(e.added) + "d</span></button>").join("") + "</div>"
+          : '<p style="color:var(--faint);font-size:13.5px">Nothing untouched. Suspicious.</p>') +
+      "</section>" +
+
+      '<section class="panel glass"><span class="eyebrow">What you actually like</span>' +
+        (affRows ? '<div class="rows">' + affRows + "</div>" +
+          '<p style="font-size:12.5px;color:var(--faint);margin-top:16px;line-height:1.6">Averaged from your own scores. This is what nudges the Tonight shortlist.</p>'
+          : '<p style="color:var(--faint);font-size:13.5px">Score a few games and your genres sort themselves out.</p>') +
+      "</section>" +
+
+    "</div></div>";
+}
+
+/* ============================================================
+   7. GAME DETAIL
+   ============================================================ */
+function detailHTML(id){
+  const g = game(id); if (!g) return "";
+  const e = entry(id);
+  const len = lengthOf(g, e);
+  const pct = Math.min(100, Math.round(e.hours / len * 100));
+
+  const intents = Object.entries(INTENTS).map(([k, label]) =>
+    '<button class="intent' + (e.intent === k ? " on" : "") + '" data-intent="' + k + '">' +
+    "<b>" + hrs(g.hltb[k]) + "</b><span>" + label.toUpperCase() + "</span></button>").join("");
+
+  const statusBtns = Object.entries(STATUSES).map(([k, label]) =>
+    '<button class="chip' + (e.status === k ? " on" : "") + '" data-status="' + k + '">' + label + "</button>").join("");
+
+  const notes = e.notes.length
+    ? e.notes.slice().sort((a,b) => b.at - a.at).map((n, i) =>
+        '<div class="note-item"><div class="note-when">' + dateText(n.at) + "</div>" +
+        '<div class="note-body">' + esc(n.text) + "</div>" +
+        '<button class="note-del" data-delnote="' + n.at + '" aria-label="Delete note">remove</button></div>').join("")
+    : '<p style="color:var(--faint);font-size:13.5px;font-style:italic;font-family:var(--serif)">No entries yet. Notes are for during — the half-thought you want back later.</p>';
+
+  let tabBody;
+  if (ui.tab === "journal"){
+    tabBody =
+      '<div class="prog"><div class="prog-top"><span>Progress against ' + INTENTS[e.intent].toLowerCase() + "</span>" +
+        "<b>" + hrs(e.hours) + " of ~" + hrs(len) + " · " + pct + "%</b></div>" +
+        '<div class="prog-track"><div class="prog-fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="logrow"><label for="loghrs">Log</label><input class="field num" id="loghrs" type="number" min="0" step="0.5" placeholder="2"> hours played' +
+          '<button class="btn sm" data-log="1">Add</button>' +
+          (e.hours ? '<button class="btn ghost sm" data-resethrs="1">Reset</button>' : "") +
+        "</div></div>" +
+      '<textarea class="field" id="noteInput" rows="3" placeholder="What happened this session?"></textarea>' +
+      '<div class="rev-acts"><button class="btn primary sm" data-addnote="1">Add entry</button></div>' +
+      '<div class="notes">' + notes + "</div>";
+  } else if (ui.tab === "review"){
+    tabBody = ui.editingReview
+      ? '<textarea class="field" id="reviewInput" rows="14" placeholder="Take your time. Blank line between paragraphs.">' + esc(e.review) + "</textarea>" +
+        '<div class="rev-acts"><button class="btn primary sm" data-savereview="1">Save review</button>' +
+        '<button class="btn ghost sm" data-cancelreview="1">Cancel</button></div>'
+      : (e.review
+          ? '<div class="review-read">' + e.review.split(/\n\s*\n/).map(p => "<p>" + esc(p) + "</p>").join("") + "</div>" +
+            '<div class="rev-acts"><button class="btn sm" data-editreview="1">Edit</button></div>'
+          : '<p class="review-empty">Nothing written yet. When you have finished it and had a day to sit with it, this is where it goes.</p>' +
+            '<div class="rev-acts"><button class="btn primary sm" data-editreview="1">Write a review</button></div>');
+  } else {
+    const items = e.history.slice().sort((a,b) => b.at - a.at);
+    tabBody = items.length
+      ? '<div class="hist">' + items.map(h =>
+          '<div class="hist-item"><span class="hist-dot ' + h.status + '"></span>' +
+          '<div class="hist-txt">' + (h.status === "backlog" ? "Added to the shelf" :
+             h.status === "playing" ? "Started playing" :
+             h.status === "completed" ? "Finished" : "Put down") +
+            (h.note ? "<em>" + esc(h.note) + "</em>" : "") + "</div>" +
+          '<span class="hist-when">' + dateText(h.at) + "</span></div>").join("") + "</div>"
+      : '<p style="color:var(--faint);font-size:13.5px">Nothing recorded yet.</p>';
+  }
+
+  const a = affinityFor(g, affinity());
+
+  return '<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(g.title) + '">' +
+    '<div class="sheet-hero" style="--h:' + hue(g.id) + '">' +
+      '<button class="x" data-close="1" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>' +
+      '<div class="hero-in">' + spine(g) +
+        '<div class="hero-id"><h2>' + esc(g.title) + "</h2>" +
+          '<p class="hero-sub">' + esc(g.dev) + (g.pub !== g.dev ? " · published by " + esc(g.pub) : "") + " · " + g.year + "</p>" +
+          '<div class="hero-tags">' + g.genres.concat(g.platforms).map(t => '<span class="tag">' + esc(t) + "</span>").join("") + "</div>" +
+        "</div></div></div>" +
+
+    '<div class="trip">' +
+      '<div><span class="eyebrow">How long — HowLongToBeat</span>' +
+        '<div class="big">' + hrs(len).replace("h", "") + '<small>hours, ' + INTENTS[e.intent].toLowerCase() + "</small></div>" +
+        '<div class="intents">' + intents + "</div>" +
+        '<p class="note">Pick what you actually intend to do. This is the number your backlog debt counts.</p></div>' +
+
+      '<div><span class="eyebrow">What they thought — OpenCritic</span>' +
+        '<div class="oc-tier"><div class="big" style="color:var(--' + tier(g.oc.score) + ')">' + g.oc.score + "</div>" +
+          '<div><div class="tierword" style="color:var(--' + tier(g.oc.score) + ')">' + tierWord(g.oc.score) + "</div>" +
+          '<div style="font-size:12px;color:var(--faint)">' + g.oc.recommend + "% recommend</div></div></div>" +
+        '<div class="quotes">' + g.quotes.map(([q, who]) =>
+          '<div class="quote"><q>' + esc(q) + "</q><cite>" + esc(who) + "</cite></div>").join("") + "</div></div>" +
+
+      '<div><span class="eyebrow">What you thought</span>' +
+        '<div class="big" style="color:' + (e.score != null ? "var(--purple)" : "var(--faint)") + '" id="scoreOut">' +
+          (e.score != null ? e.score + "<small>out of 10</small>"
+                           : '<span style="font-size:19px;font-family:var(--sans);font-weight:400">Not rated yet</span>') + "</div>" +
+        '<input class="slider" id="score" type="range" min="0" max="10" step="0.5" value="' + (e.score ?? 0) + '" aria-label="Your score out of 10">' +
+        '<p class="note">' +
+          (e.score != null
+            ? (function(){
+                const d = e.score - g.oc.score/10;
+                return Math.abs(d) < .5 ? "You and the critics agree, near enough."
+                     : d > 0 ? "You rate it " + d.toFixed(1) + " higher than they did."
+                             : "You rate it " + Math.abs(d).toFixed(1) + " lower than they did.";
+              })()
+            : "Drag to score. Same 0–10 axis as OpenCritic, so the gap is the interesting bit.") +
+          (a != null ? "<br>Your average for " + esc(g.genres[0]) + ": " + a.toFixed(1) + "." : "") +
+        "</p></div></div>" +
+
+    '<div class="statusbar"><span class="eyebrow">Status</span>' + statusBtns +
+      (e.status === "dropped" && e.reason
+        ? '<span style="font-size:12.5px;color:var(--muted);font-style:italic;flex-basis:100%;margin-top:6px">“' + esc(e.reason) + "”</span>"
+        : "") +
+    "</div>" +
+
+    '<div class="tabs" role="tablist">' +
+      '<button class="tab' + (ui.tab === "journal" ? " on" : "") + '" data-tab="journal">Journal<i>' + e.notes.length + "</i></button>" +
+      '<button class="tab' + (ui.tab === "review" ? " on" : "") + '" data-tab="review">Review' + (e.review ? "<i>●</i>" : "") + "</button>" +
+      '<button class="tab' + (ui.tab === "history" ? " on" : "") + '" data-tab="history">History<i>' + e.history.length + "</i></button>" +
+    '</div><div class="tabbody">' + tabBody + "</div>" +
+
+    "</div></div>";
+}
+
+/* ============================================================
+   8. ACTIONS
+   ============================================================ */
+function setStatus(id, next){
+  const e = entry(id), now = Date.now();
+  if (e.status === next) return;
+  let note = "";
+  if (next === "dropped"){
+    const r = prompt("Putting it down is fine. What made you stop?", e.reason || "");
+    if (r === null) return;
+    note = r.trim(); e.reason = note;
+  }
+  e.status = next;
+  if (next === "playing"  && !e.started)  e.started  = now;
+  if (next === "completed") e.finished = now;
+  if (next === "backlog"){ e.finished = null; e.reason = ""; }
+  e.history.push({at:now, status:next, note});
+  save();
+  toast(game(id).title + " → " + STATUSES[next]);
+}
+
+function currentRoute(){
+  const h = (location.hash || "#/tonight").replace(/^#\/?/, "");
+  const [view, id] = h.split("/");
+  return {view: view || "tonight", id};
+}
+function go(view){ location.hash = "#/" + view; }
+function openGame(id){ location.hash = "#/game/" + id; }
+function closeGame(){
+  if (currentRoute().view === "game") history.back();
+}
+
+/* ============================================================
+   9. RENDER + ROUTER
+   ============================================================ */
+function render(){
+  // Re-rendering rips out whatever is focused; blurring first keeps the browser
+  // from firing blur handlers midway through the innerHTML swap.
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  const r = currentRoute();
+  const isGame = r.view === "game";
+  const view = isGame ? ui.view : (["tonight","shelf","stats"].includes(r.view) ? r.view : "tonight");
+  ui.view = view;
+
+  document.querySelectorAll(".rail-btn").forEach(b => b.classList.toggle("on", b.dataset.go === view));
+
+  const box = document.getElementById("view");
+  box.className = ui.animated === view ? "wrap" : "wrap animate";
+  ui.animated = view;
+  box.innerHTML = view === "shelf" ? viewShelf() : view === "stats" ? viewStats() : viewTonight();
+
+  const ov = document.getElementById("overlay");
+  if (isGame && game(r.id)){
+    const wasOpen = ov.dataset.id === r.id;
+    ov.dataset.id = r.id;
+    ov.innerHTML = detailHTML(r.id);
+    document.body.style.overflow = "hidden";
+    if (!wasOpen) ov.querySelector(".sheet")?.focus?.();
+  } else {
+    ov.innerHTML = ""; delete ov.dataset.id;
+    document.body.style.overflow = "";
+  }
+}
+
+/* one delegated handler for everything clickable */
+document.addEventListener("click", ev => {
+  const t = ev.target;
+  const hit = sel => t.closest("[" + sel + "]");
+  const r = currentRoute();
+  let el;
+
+  if ((el = hit("data-go")))     return go(el.dataset.go);
+  if ((el = hit("data-open")))   return openGame(el.dataset.open);
+  if ((el = hit("data-close")))  return closeGame();
+
+  /* tonight */
+  if ((el = hit("data-app")))  { ui.appetite = ui.appetite === el.dataset.app ? null : el.dataset.app; return render(); }
+  if ((el = hit("data-mood"))) { ui.mood = ui.mood === el.dataset.mood ? null : el.dataset.mood; return render(); }
+  if ((el = hit("data-start"))){ setStatus(el.dataset.start, "playing"); return openGame(el.dataset.start); }
+  if ((el = hit("data-snooze"))){
+    const e = entry(el.dataset.snooze);
+    e.snoozed = Date.now() + 7 * D; save();
+    toast("Hidden for a week."); return render();
+  }
+
+  /* shelf */
+  if ((el = hit("data-f")))    { ui[el.dataset.f] = el.dataset.v; return render(); }
+  if ((el = hit("data-mode"))) { ui.mode = el.dataset.mode; return render(); }
+
+  /* detail */
+  if ((el = hit("data-intent"))){ entry(r.id).intent = el.dataset.intent; save(); return render(); }
+  if ((el = hit("data-status"))){ setStatus(r.id, el.dataset.status); return render(); }
+  if ((el = hit("data-tab")))  { ui.tab = el.dataset.tab; ui.editingReview = false; return render(); }
+
+  if (hit("data-log")){
+    const inp = document.getElementById("loghrs");
+    const v = parseFloat(inp.value);
+    if (!v || v <= 0) { inp.focus(); return toast("Enter how many hours you played."); }
+    const e = entry(r.id);
+    e.hours = Math.round((e.hours + v) * 2) / 2;
+    if (e.status === "backlog") setStatus(r.id, "playing");
+    save(); toast("Logged " + hrs(v) + "."); return render();
+  }
+  if (hit("data-resethrs")){ entry(r.id).hours = 0; save(); return render(); }
+
+  if (hit("data-addnote")){
+    const inp = document.getElementById("noteInput");
+    const text = inp.value.trim();
+    if (!text) { inp.focus(); return; }
+    entry(r.id).notes.push({at:Date.now(), text});
+    save(); toast("Entry added."); return render();
+  }
+  if ((el = hit("data-delnote"))){
+    const e = entry(r.id), at = Number(el.dataset.delnote);
+    e.notes = e.notes.filter(n => n.at !== at);
+    save(); return render();
+  }
+
+  if (hit("data-editreview")) { ui.editingReview = true;  return render(); }
+  if (hit("data-cancelreview")){ ui.editingReview = false; return render(); }
+  if (hit("data-savereview")){
+    entry(r.id).review = document.getElementById("reviewInput").value.trim();
+    ui.editingReview = false; save(); toast("Review saved."); return render();
+  }
+
+  /* click the scrim, not the sheet, to close */
+  if (t.id === "scrim") return closeGame();
+});
+
+document.addEventListener("input", ev => {
+  const t = ev.target;
+  if (t.id === "q")      { ui.q = t.value; renderShelfResults(); }
+  if (t.id === "score")  {
+    const out = document.getElementById("scoreOut");
+    out.innerHTML = parseFloat(t.value) + "<small>out of 10</small>";
+    out.style.color = "var(--purple)";     // commits the moment you drag
+  }
+  if (t.id === "weekly") {
+    const v = Math.max(1, Math.min(80, parseInt(t.value, 10) || 8));
+    state.prefs.weekly = v; save();
+  }
+});
+document.addEventListener("change", ev => {
+  if (ev.target.id === "score"){
+    entry(currentRoute().id).score = parseFloat(ev.target.value);
+    save(); render();
+  }
+  if (ev.target.id === "weekly") render();
+});
+
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape" && currentRoute().view === "game") closeGame();
+});
+
+window.addEventListener("hashchange", render);
+
+/* boot */
+state = load();
+if (!location.hash) location.replace("#/tonight");
+render();
+</script>
+</body>
+</html>
