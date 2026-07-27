@@ -457,6 +457,8 @@ table.games .n{font-family:var(--mono);font-variant-numeric:tabular-nums;color:v
 .big{font-family:var(--serif);font-size:40px;line-height:1;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .big small{font-family:var(--sans);font-size:14px;font-weight:400;color:var(--muted);margin-left:5px;letter-spacing:0}
 .trip .note{font-size:12px;color:var(--faint);margin-top:9px;line-height:1.5}
+.spread{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5}
+.spread b{color:var(--text);font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600}
 
 .intents{display:flex;gap:5px;margin-top:13px}
 .intent{flex:1;padding:7px 4px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);text-align:center;transition:all .2s}
@@ -692,7 +694,7 @@ function isCustom(id){ return !!(state.custom && state.custom.some(g => g.id ===
 
 function blankEntry(){
   return {status:"backlog", intent:"main", added:Date.now(), started:null, finished:null,
-          score:null, hours:0, price:null, reason:"", notes:[], review:"", snoozed:0, history:[],
+          score:null, hours:0, price:null, hltbOverride:null, reason:"", notes:[], review:"", snoozed:0, history:[],
           updatedAt:Date.now(), shared:false, shareReview:false};
 }
 
@@ -743,6 +745,7 @@ function migrate(p){
     const e = p.entries[id];
     if (e.price === undefined) e.price = null;
     if (e.updatedAt == null) e.updatedAt = p.updatedAt;   // merge needs a stamp
+    if (e.hltbOverride === undefined) e.hltbOverride = null;
     if (e.shared === undefined) e.shared = false;         // public profile opt-in
     if (e.shareReview === undefined) e.shareReview = false;
     if (!Array.isArray(e.history)) e.history = [];
@@ -1088,11 +1091,25 @@ function tierWord(s){ return s >= 90 ? "Mighty" : s >= 80 ? "Strong" : s >= 70 ?
 /* A user-added game may have no length at all. Say so rather than inventing one. */
 function hasLength(g){ return knownIntents(g).length > 0; }
 function knownIntents(g){ return Object.keys(INTENTS).filter(k => g.hltb && g.hltb[k] != null); }
+
+/* Your own estimate beats the crowd's. HowLongToBeat figures are widely held to
+   run long — completionist worst — so any game's estimate can be replaced, and
+   every length figure in the app flows through here. */
 function lengthOf(g, e){
+  if (e && e.hltbOverride != null) return e.hltbOverride;
   if (!g.hltb) return 0;
   if (g.hltb[e.intent] != null) return g.hltb[e.intent];
   const first = knownIntents(g)[0];
   return first ? g.hltb[first] : 0;
+}
+
+/* The genuine spread across this game's own intents — real data, not a
+   synthesised error bar. Returns null when there is nothing to spread. */
+function lengthRange(g){
+  const vals = knownIntents(g).map(k => g.hltb[k]).filter(v => v > 0);
+  if (vals.length < 2) return null;
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  return lo === hi ? null : {lo, hi};
 }
 function remaining(g, e){ return Math.max(0, lengthOf(g, e) - e.hours); }
 function bucket(h){ return h < 10 ? "short" : h < 25 ? "mid" : h < 60 ? "long" : "epic"; }
@@ -1157,12 +1174,35 @@ const MOODS = {
   sink:   {label:"Something to sink into", hint:"the long haul"},
   finish: {label:"Finish what I started",  hint:"already playing"}
 };
-const WEIGHTS = {fit:.40, critical:.25, neglect:.20, taste:.15};
+/* The critic score matters most when we know nothing about you, and least once
+   you have opinions of your own on record. This audience distrusts aggregate
+   scores precisely because they cannot account for personal taste — so weight
+   shifts from the critics to you as evidence accumulates. With no ratings it
+   behaves exactly as it always has; by about a dozen your taste outweighs them. */
+const BASE_WEIGHTS = {fit:.40, critical:.25, neglect:.20, taste:.15};
+/* Calibrated so the crossover lands at ~10 rated games, not 4 — a handful of
+   scores is not yet evidence, and the seeded shelf already carries four. The
+   ceiling keeps the critics at 12%: still useful signal for the many games you
+   have no opinion on. */
+const SHIFT_PER_RATING = .005;
+const MAX_SHIFT = .13;
+
+function ratedCount(){
+  let n = 0;
+  for (const g of getGames()) if ((state.entries[g.id] || {}).score != null) n++;
+  return n;
+}
+function weights(){
+  const shift = Math.min(MAX_SHIFT, ratedCount() * SHIFT_PER_RATING);
+  return {fit:BASE_WEIGHTS.fit, neglect:BASE_WEIGHTS.neglect,
+          critical:BASE_WEIGHTS.critical - shift, taste:BASE_WEIGHTS.taste + shift};
+}
+const pct = w => Math.round(w * 100);
 
 function candidates(){
   const app = APPETITES[ui.appetite];
   if (!app) return [];
-  const aff = affinity(), now = Date.now();
+  const aff = affinity(), now = Date.now(), W = weights();
   const pool = getGames().filter(g => {
     const e = entry(g.id);
     if (e.snoozed > now) return false;
@@ -1187,7 +1227,7 @@ function candidates(){
     const a = affinityFor(g, aff);
     const taste = a != null ? a / 10 : .7;
 
-    let total = WEIGHTS.fit*fit + WEIGHTS.critical*critical + WEIGHTS.neglect*neglect + WEIGHTS.taste*taste;
+    let total = W.fit*fit + W.critical*critical + W.neglect*neglect + W.taste*taste;
     if (ui.mood === "great")  total += critical * .12;
     if (ui.mood === "finish") total += .1;
 
@@ -1240,12 +1280,12 @@ function weekStrip(){
     '<div class="week-list">' + ids.map(id => {
       const g = game(id), e = entry(id);
       const known = hasLength(g);
-      const pct = known ? Math.min(100, Math.round(e.hours / lengthOf(g, e) * 100)) : 0;
+      const wpct = known ? Math.min(100, Math.round(e.hours / lengthOf(g, e) * 100)) : 0;
       return '<div class="week-item" style="--h:' + hue(id) + '">' +
         '<button class="week-open" data-open="' + id + '">' + spine(g) + "</button>" +
         '<div class="week-id"><b>' + esc(g.title) + "</b>" +
-          '<div class="week-prog"><span style="width:' + pct + '%"></span></div>' +
-          '<span class="week-meta num">' + (known ? hrs(e.hours) + " of ~" + hrs(lengthOf(g, e)) + " · " + pct + "%"
+          '<div class="week-prog"><span style="width:' + wpct + '%"></span></div>' +
+          '<span class="week-meta num">' + (known ? hrs(e.hours) + " of ~" + hrs(lengthOf(g, e)) + " · " + wpct + "%"
                                                   : hrs(e.hours) + " played") + "</span>" +
         "</div>" +
         '<button class="week-drop" data-unweek="' + id + '" aria-label="Remove from this week">×</button>' +
@@ -1295,8 +1335,8 @@ function viewTonight(){
                 '<svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>' +
                 (e.status === "playing" ? "Keep going" : "Start playing") + "</button>" +
               (weekIds().includes(g.id)
-                ? '<button class="btn ghost sm" disabled>On this week</button>'
-                : '<button class="btn sm" data-week="' + g.id + '">Add to this week</button>') +
+                ? '<button class="btn ghost sm" disabled>On the list</button>'
+                : '<button class="btn sm" data-week="' + g.id + '">Add to week</button>') +
               '<button class="btn ghost sm" data-snooze="' + g.id + '">Not tonight</button>' +
               '<button class="btn ghost sm" data-open="' + g.id + '">Details</button>' +
             "</div></article>";
@@ -1317,13 +1357,25 @@ function viewTonight(){
       "</div></section>" +
     body +
     snoozedStrip() +
-    (picked ? '<details class="why-these"><summary>Why these three?</summary><div class="box glass">' +
-      "Each candidate scores on four things, weighted: <b>time fit " + (WEIGHTS.fit*100) + "%</b> — how close its remaining length sits to what you said you had; " +
-      "<b>critical reception " + (WEIGHTS.critical*100) + "%</b> — the OpenCritic score; " +
-      "<b>neglect " + (WEIGHTS.neglect*100) + "%</b> — how long it has sat unplayed, so the shelf rotates instead of showing you the same three forever; " +
-      "and <b>your taste " + (WEIGHTS.taste*100) + "%</b> — the average score you've given games in the same genres. " +
-      "Remaining length uses <em>your</em> chosen intent per game, not the completionist figure. " +
-      "<b>Not tonight</b> hides a game for a week.</div></details>" : "") +
+    (picked ? (function(){
+      const W = weights(), n = ratedCount(), maxed = W.taste >= BASE_WEIGHTS.taste + MAX_SHIFT;
+      return '<details class="why-these"><summary>Why these three?</summary><div class="box glass">' +
+        "Each candidate scores on four things, weighted: <b>time fit " + pct(W.fit) + "%</b> — how close its remaining length sits to what you said you had; " +
+        "<b>critical reception " + pct(W.critical) + "%</b> — the OpenCritic score; " +
+        "<b>neglect " + pct(W.neglect) + "%</b> — how long it has sat unplayed, so the shelf rotates instead of showing you the same three forever; " +
+        "and <b>your taste " + pct(W.taste) + "%</b> — the average score you've given games in the same genres. " +
+        "Remaining length uses <em>your</em> chosen intent per game, not the completionist figure. " +
+        "<b>Not tonight</b> hides a game for a week." +
+        '<p style="margin-top:12px">' +
+          (n === 0
+            ? "Those last two shift as you go. Right now nothing is known about your taste, so the critics carry it — score a few games and their share moves to you."
+            : "Because you have scored <b>" + n + (n === 1 ? " game" : " games") + "</b>, " +
+              (W.taste > W.critical
+                ? "your own taste now outweighs the critics" + (maxed ? " and has reached its ceiling" : "") + "."
+                : "some weight has already moved from the critics to you") +
+              " — an aggregate score can't account for what you personally like, so it matters less the more you tell it.") +
+        "</p></div></details>";
+    })() : "") +
     "</div>";
 }
 
@@ -1747,8 +1799,10 @@ function detailHTML(id){
   const g = game(id); if (!g) return "";
   const e = entry(id);
   const known = hasLength(g);
+  const overridden = e.hltbOverride != null;
+  const range = overridden ? null : lengthRange(g);
   const len = lengthOf(g, e);
-  const pct = known && len ? Math.min(100, Math.round(e.hours / len * 100)) : 0;
+  const done = (known || overridden) && len ? Math.min(100, Math.round(e.hours / len * 100)) : 0;
 
   // only offer the intents this game actually has figures for
   const intents = knownIntents(g).map(k =>
@@ -1769,9 +1823,9 @@ function detailHTML(id){
   if (ui.tab === "journal"){
     tabBody =
       '<div class="prog"><div class="prog-top"><span>' +
-        (known ? "Progress against " + INTENTS[e.intent].toLowerCase() : "Hours played") + "</span>" +
-        "<b>" + (known ? hrs(e.hours) + " of ~" + hrs(len) + " · " + pct + "%" : hrs(e.hours)) + "</b></div>" +
-        (known ? '<div class="prog-track"><div class="prog-fill" style="width:' + pct + '%"></div></div>' : "") +
+        ((known || overridden) ? "Progress against " + (overridden ? "your estimate" : INTENTS[e.intent].toLowerCase()) : "Hours played") + "</span>" +
+        "<b>" + ((known || overridden) ? hrs(e.hours) + " of ~" + hrs(len) + " · " + done + "%" : hrs(e.hours)) + "</b></div>" +
+        ((known || overridden) ? '<div class="prog-track"><div class="prog-fill" style="width:' + done + '%"></div></div>' : "") +
         '<div class="logrow"><label for="loghrs">Log</label><input class="field num" id="loghrs" type="number" min="0" step="0.5" placeholder="2"> hours played' +
           '<button class="btn sm" data-log="1">Add</button>' +
           (e.hours ? '<button class="btn ghost sm" data-resethrs="1">Reset</button>' : "") +
@@ -1818,14 +1872,29 @@ function detailHTML(id){
         "</div></div></div>" +
 
     '<div class="trip">' +
-      '<div><span class="eyebrow">How long — HowLongToBeat</span>' +
-        (known
-          ? '<div class="big">' + hrs(len).replace("h", "") + '<small>hours, ' + INTENTS[e.intent].toLowerCase() + "</small></div>" +
-            '<div class="intents">' + intents + "</div>" +
-            '<p class="note">Pick what you actually intend to do. Every length figure follows this one.</p>'
+      '<div><span class="eyebrow">How long — ' + (overridden ? "your estimate" : "HowLongToBeat") + "</span>" +
+        (known || overridden
+          ? '<div class="big">' + hrs(len).replace("h", "") +
+              "<small>hours, " + (overridden ? "your figure" : INTENTS[e.intent].toLowerCase()) + "</small></div>" +
+            (range
+              ? '<p class="spread">Reported anywhere from <b>' + hrs(range.lo) + "</b> to <b>" + hrs(range.hi) +
+                "</b> depending how you play it.</p>"
+              : "") +
+            (overridden ? "" : '<div class="intents">' + intents + "</div>") +
+            '<div class="logrow" style="margin-top:12px">' +
+              '<label for="ownEst">' + (overridden ? "Your estimate" : "Use my own") + "</label>" +
+              '<input class="field num" id="ownEst" type="number" min="0" step="0.5" placeholder="hours" value="' +
+                (e.hltbOverride ?? "") + '">' +
+              (overridden ? '<button class="btn ghost sm" data-clearest="1">Use HowLongToBeat</button>' : "") +
+            "</div>" +
+            '<p class="note">' + (overridden
+              ? "Your figure is driving every length in the app for this game."
+              : "Pick what you actually intend to do. Every length figure follows this one — and these estimates are crowd-sourced, so treat them as a guide.") + "</p>"
           : '<div class="big" style="color:var(--faint)"><span style="font-size:19px;font-family:var(--sans);font-weight:400">No length recorded</span></div>' +
-            '<p class="note">' + (isCustom(g.id) ? "Add hours in edit and the intent picker appears."
-                                                 : "No HowLongToBeat figures for this one.") + "</p>") +
+            '<div class="logrow" style="margin-top:12px"><label for="ownEst">Your estimate</label>' +
+              '<input class="field num" id="ownEst" type="number" min="0" step="0.5" placeholder="hours"></label></div>' +
+            '<p class="note">' + (isCustom(g.id) ? "Add hours here or in edit, and the intent picker appears."
+                                                 : "No HowLongToBeat figures for this one — put in your own and the app will use it.") + "</p>") +
       "</div>" +
 
       '<div><span class="eyebrow">What they thought — OpenCritic</span>' +
@@ -2308,6 +2377,7 @@ document.addEventListener("click", ev => {
     save(r.id); toast("Logged " + hrs(v) + "."); return render();
   }
   if (hit("data-resethrs")){ entry(r.id).hours = 0; save(r.id); return render(); }
+  if (hit("data-clearest")){ entry(r.id).hltbOverride = null; save(r.id); toast("Back to HowLongToBeat."); return render(); }
 
   if (hit("data-addnote")){
     const inp = document.getElementById("noteInput");
@@ -2356,6 +2426,11 @@ document.addEventListener("change", ev => {
   if (t.id === "paidIn"){
     const v = parseFloat(t.value);
     entry(currentRoute().id).price = isNaN(v) || v < 0 ? null : v;
+    save(currentRoute().id); render();
+  }
+  if (t.id === "ownEst"){
+    const v = parseFloat(t.value);
+    entry(currentRoute().id).hltbOverride = isNaN(v) || v <= 0 ? null : v;
     save(currentRoute().id); render();
   }
   if (t.id === "shareIn"){
