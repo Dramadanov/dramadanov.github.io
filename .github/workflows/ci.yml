@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: accessprofile
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/accessprofile?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # The match engine decides whether a disabled player is told a game works.
+      # Anything less than full branch coverage on it fails the build.
+      - name: Match engine coverage gate
+        run: pnpm --filter @access-profile/match test:coverage
+
+      - name: Prisma schema validates
+        run: pnpm --filter @access-profile/db exec prisma validate
+
+      - name: Migrations apply clean to an empty database
+        run: pnpm --filter @access-profile/db exec prisma migrate deploy
+
+      # Prisma resets whatever it is given as a shadow database, so this gets a
+      # throwaway of its own rather than the one we just migrated.
+      - name: Create shadow database
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE shadow;'
+        env:
+          PGPASSWORD: postgres
+
+      - name: Migrations match the schema
+        run: |
+          pnpm --filter @access-profile/db exec prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "postgresql://postgres:postgres@localhost:5432/shadow?schema=public" \
+            --exit-code
+
+  purity:
+    name: match engine stays pure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # packages/match imports nothing. No Prisma, no fetch, no env. If this
+      # grep ever matches, the engine can no longer run client-side and the
+      # zero-server-cost architecture is gone.
+      - name: No I/O in packages/match
+        run: |
+          if grep -rnE "from '(@prisma|node:|fs|path)|require\(|process\.env|\bfetch\(" \
+              packages/match/src; then
+            echo "::error::packages/match must stay pure — no imports, no I/O, no env."
+            exit 1
+          fi
+          echo "packages/match is clean."
