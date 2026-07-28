@@ -1,0 +1,26 @@
+{
+  "name": "@access-profile/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "prisma:validate": "prisma validate",
+    "prisma:generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed:sources": "tsx src/seed/sources.ts",
+    "seed:taxonomy": "tsx src/seed/taxonomy.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "prisma": "^6.19.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
+  }
+}

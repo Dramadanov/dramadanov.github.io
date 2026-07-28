@@ -1,0 +1,288 @@
+// Access Profile — authoring/CMS schema.
+//
+// Postgres is the authoring side ONLY. It is never on the public request path:
+// the read side ships as versioned static JSON chunks built from this data, so
+// the database can be down and the site still works (plan §3).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaxonomyCategory {
+  VISUAL
+  AUDITORY
+  MOTOR
+  COGNITIVE
+  SPEECH
+}
+
+enum TaxonomySource {
+  AGI
+  EXTENDED
+}
+
+/// Absence of data is UNVERIFIED, never ABSENT.
+enum ClaimState {
+  PRESENT
+  ABSENT
+  PARTIAL
+  UNVERIFIED
+}
+
+enum SourceKind {
+  PUBLISHER
+  STOREFRONT
+  REVIEWER
+  COMMUNITY
+  FIRSTPARTY_TEST
+}
+
+enum BarrierSeverity {
+  HARD
+  SITUATIONAL
+}
+
+enum NeedSeverity {
+  BLOCKER
+  FRICTION
+  PREFERENCE
+}
+
+model Game {
+  id          String    @id @default(cuid())
+  igdbId      Int       @unique
+  name        String
+  releaseDate DateTime?
+  coverUrl    String?
+
+  platforms GamePlatform[]
+  claims    FeatureClaim[]
+  barriers  Barrier[]
+  recipes   SettingsRecipe[]
+  aliases   GameAlias[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model Platform {
+  /// pc-steam, ps5, xbox-series, switch, switch-2
+  id   String @id @default(cuid())
+  slug String @unique
+  name String
+
+  games    GamePlatform[]
+  claims   FeatureClaim[]
+  barriers Barrier[]
+  recipes  SettingsRecipe[]
+}
+
+model GamePlatform {
+  gameId     String
+  platformId String
+
+  game     Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, platformId])
+  @@index([platformId])
+}
+
+/// Every other source names games differently, so IGDB ids are canonical and
+/// everything else resolves through here (plan §3).
+model GameAlias {
+  id     String @id @default(cuid())
+  gameId String
+  /// Which external namespace this alias belongs to, e.g. "steam", "xbox".
+  scope  String
+  value  String
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([scope, value])
+  @@index([gameId])
+}
+
+/// The vocabulary of needs and features. Seeded from the ESA Accessible Games
+/// Initiative tag set, extended with needs the AGI set does not express.
+///
+/// Every row carries the URL it was sourced from — including the AGI rows.
+model FeatureTaxonomy {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  label       String
+  description String
+  category    TaxonomyCategory
+  source      TaxonomySource
+
+  /// Where this tag definition came from. Required: tags are not authored from
+  /// memory, including by Claude Code during development.
+  sourceUrl  String
+  capturedAt DateTime
+
+  claims   FeatureClaim[]
+  barriers Barrier[]
+  needs    ProfileNeed[]
+
+  @@index([category])
+}
+
+/// "This game has this feature" — a claim, with provenance. Never a fact.
+model FeatureClaim {
+  id         String @id @default(cuid())
+  gameId     String
+  platformId String
+  taxonomyId String
+
+  state ClaimState
+  note  String?
+
+  sourceId String
+  /// Non-null by design: no source, no claim.
+  sourceUrl  String
+  capturedAt DateTime
+
+  verifiedBy String?
+  verifiedAt DateTime?
+
+  game     Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform Platform        @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  taxonomy FeatureTaxonomy @relation(fields: [taxonomyId], references: [id])
+  source   Source          @relation(fields: [sourceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One claim per source per (game, platform, feature); reruns update in place,
+  /// which is what makes ingestion idempotent.
+  @@unique([gameId, platformId, taxonomyId, sourceId])
+  @@index([gameId, platformId])
+  @@index([taxonomyId])
+}
+
+model Source {
+  id   String     @id @default(cuid())
+  name String     @unique
+  kind SourceKind
+  /// 1..4, higher is more trusted. Drives conflict resolution (plan §5):
+  /// first-party testing > publisher/storefront > established reviewer > community.
+  trustTier Int
+
+  claims FeatureClaim[]
+
+  createdAt DateTime @default(now())
+}
+
+/// The inverse of a feature, and more decisive. "Has a colourblind mode" and
+/// "has an unskippable QTE requiring 8 inputs per second" are not opposites,
+/// and only the second decides whether someone can finish the game.
+model Barrier {
+  id         String @id @default(cuid())
+  gameId     String
+  platformId String
+  taxonomyId String
+
+  severity    BarrierSeverity
+  description String
+
+  workaroundRecipeId String?
+  sourceUrl          String
+
+  game      Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform  Platform        @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  taxonomy  FeatureTaxonomy @relation(fields: [taxonomyId], references: [id])
+  workaround SettingsRecipe? @relation(fields: [workaroundRecipeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gameId, platformId])
+  @@index([taxonomyId])
+}
+
+/// Versioned against a game build: menus move between patches (plan §2.5).
+model SettingsRecipe {
+  id         String @id @default(cuid())
+  gameId     String
+  platformId String
+
+  title   String
+  summary String
+
+  gameVersion String
+  verifiedAt  DateTime
+  verifiedBy  String
+  /// Defaults to verifiedAt + 180 days; set explicitly to override.
+  staleAt     DateTime
+
+  /// Taxonomy ids this recipe addresses. Denormalised deliberately: this array
+  /// ships to the client inside the static data chunk the match engine reads.
+  addressesTaxonomyIds String[]
+
+  /// Nothing publishes unverified (plan §6, Phase 5).
+  published Boolean @default(false)
+
+  game     Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  steps         RecipeStep[]
+  workaroundFor Barrier[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([gameId, platformId])
+  @@index([staleAt])
+}
+
+model RecipeStep {
+  id       String @id @default(cuid())
+  recipeId String
+  order    Int
+
+  /// "Options > Accessibility > Visual"
+  menuPath String
+  /// "Set Subtitle Size to Large"
+  action        String
+  note          String?
+  screenshotUrl String?
+
+  recipe SettingsRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, order])
+}
+
+/// Present in the schema for completeness against plan §4, but note the hard
+/// privacy constraint: the player's profile lives in localStorage and in the URL
+/// fragment of a share link, and is never written to this database. Access needs
+/// are health-adjacent data (plan §2.7).
+///
+/// These two models exist only for local/authoring fixtures and must not be
+/// populated from player traffic.
+model Profile {
+  id        String   @id @default(cuid())
+  shareSlug String   @unique
+  createdAt DateTime @default(now())
+
+  needs ProfileNeed[]
+}
+
+model ProfileNeed {
+  id         String       @id @default(cuid())
+  profileId  String
+  taxonomyId String
+  severity   NeedSeverity
+
+  profile  Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  taxonomy FeatureTaxonomy @relation(fields: [taxonomyId], references: [id])
+
+  @@unique([profileId, taxonomyId])
+}
