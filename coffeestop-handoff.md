@@ -1,10 +1,10 @@
-# Grounds — Project Handoff
+# CoffeeStop — Project Handoff
 
 ## Overview
 
-**Grounds** is a mobile coffee shop discovery app prototype. Specialty-coffee-first: it surfaces not just where to get coffee but what's in the cup — bean origin, processing method, trade relationship, brew methods, atmosphere. The prototype is a fully self-contained single HTML file with no external dependencies beyond Google Fonts.
+**CoffeeStop** (working name, formerly *Grounds*) is a mobile coffee shop discovery app prototype. Specialty-coffee-first: it surfaces not just where to get coffee but what's in the cup — bean origin, processing method, trade relationship, brew methods, atmosphere. The prototype is a fully self-contained single HTML file with no external dependencies beyond Google Fonts.
 
-**Prototype file:** `grounds.html`  
+**Prototype file:** `coffeestop.html`  
 **~1540 lines** — inline CSS, HTML, and JavaScript.
 
 ---
@@ -281,7 +281,7 @@ Slides up via `translateY(100%) → translateY(0)`, `cubic-bezier(.32,.72,0,1)`,
 - State change fires when drain reaches 88%
 - `saveAnimating` guard prevents double-tap
 
-**Persistence:** `localStorage.getItem('groundsSaved')` — Set of saved shop IDs. `persistSaved()` writes it; every mutation calls `persistSaved()` then `renderSaved()` so the Saved screen is always in sync. Read on `openDetail()` to set initial heart state.
+**Persistence:** `localStorage` under `SAVE_KEY` (`coffeestopSaved`; values under the old `groundsSaved` key are migrated once on load) — Set of saved shop IDs. `persistSaved()` writes it; every mutation calls `persistSaved()` then `renderSaved()` so the Saved screen is always in sync. Read on `openDetail()` to set initial heart state.
 
 ---
 
@@ -361,12 +361,12 @@ Cards stagger in at 45ms intervals via the `cardIn` keyframe; `renderSaved()` is
 ## File Reference
 
 ```
-grounds.html          — the entire prototype (self-contained, ~1540 lines)
-grounds-handoff.md    — this document
+coffeestop.html          — the entire prototype (self-contained, ~1540 lines)
+coffeestop-handoff.md    — this document
 ```
 
 Both live at the root of `dramadanov.github.io`, so the prototype is served at
-`https://dramadanov.github.io/grounds.html`. The site's `index.html` (the writings
+`https://dramadanov.github.io/coffeestop.html`. The site's `index.html` (the writings
 archive) is untouched and does not link to it.
 
 The HTML file has no build step, no bundler, no server. Open directly in browser.

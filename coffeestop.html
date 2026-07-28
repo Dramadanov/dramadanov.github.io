@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Grounds</title>
+<title>CoffeeStop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Outfit:wght@400;500;600;700&display=swap">
 <style>
@@ -1218,7 +1218,13 @@ drawValley(bx, 0);
 /* ═══════════════════════════════════════
    SAVE — heart fill animation + localStorage
 ═══════════════════════════════════════ */
-let savedIds = new Set(JSON.parse(localStorage.getItem('groundsSaved') || '[]'));
+/* Storage key renamed with the app (Grounds → CoffeeStop); carry over anything
+   saved under the old key so early testers don't lose their list. */
+const SAVE_KEY = 'coffeestopSaved';
+if (!localStorage.getItem(SAVE_KEY) && localStorage.getItem('groundsSaved')) {
+  localStorage.setItem(SAVE_KEY, localStorage.getItem('groundsSaved'));
+}
+let savedIds = new Set(JSON.parse(localStorage.getItem(SAVE_KEY) || '[]'));
 let saveAnimating = false, saveStateTriggered = false, currentDetailId = null;
 
 function easeOutSine(t) { return Math.sin((t * Math.PI) / 2); }
@@ -1250,7 +1256,7 @@ function animateSaveHeart() {
 }
 
 function persistSaved() {
-  localStorage.setItem('groundsSaved', JSON.stringify([...savedIds]));
+  localStorage.setItem(SAVE_KEY, JSON.stringify([...savedIds]));
 }
 
 function triggerSaved() {
