@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Grounds</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --espresso:   #2A1A10;
+  --roast:      #6B4226;
+  --roast-soft: #8A5A38;
+  --caramel:    #C17A35;
+  --caramel-dk: #A8631F;
+  --crema:      #F3E9D6;
+  --foam:       #FBF5EA;
+  --kraft:      #E3D2B0;
+  --kraft-dk:   #D6C19A;
+  --sage:       #7E8A5E;
+  --clay:       #A8503A;
+  --water:      #9DB3A8;
+  --ink-60:     rgba(42,26,16,.60);
+  --ink-40:     rgba(42,26,16,.40);
+  --nav-dark:   #1a1008;
+
+  --f-display: 'Lora', Georgia, serif;
+  --f-ui:      'Outfit', system-ui, sans-serif;
+  --f-mono:    'Outfit', system-ui, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--f-ui);
+  background: radial-gradient(130% 95% at 18% 0%, #4a3320, #2c1d12 55%, #1c1008);
+  min-height: 100dvh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+
+/* ── Phone frame ── */
+.phone {
+  position: relative;
+  width: min(390px, 100%);
+  height: min(844px, calc(100dvh - 48px));
+  border-radius: 44px;
+  box-shadow: 0 0 0 10px #14100b, 0 0 0 12px #2a1e14,
+              0 32px 70px -20px rgba(0,0,0,.75);
+  overflow: hidden;
+  background: var(--kraft);
+  isolation: isolate;
+}
+@media (max-width: 460px) {
+  body { padding: 0; }
+  .phone { width: 100%; height: 100dvh; border-radius: 0; box-shadow: none; }
+}
+
+/* ── Screen container ── */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+.screen.active { display: block; }
+
+/* ══════════════════════════════
+   NEARBY — MAP SCREEN
+══════════════════════════════ */
+.map-wrap {
+  position: absolute;
+  inset: 0 0 72px 0;   /* leave space for nav bar */
+  overflow: hidden;
+  background: var(--kraft);
+}
+.map-wrap > svg.streets {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+.map-zoom-layer {
+  position: absolute; inset: 0;
+  transition: transform 0.68s cubic-bezier(0.22, 1, 0.36, 1);
+  /* no will-change — keeping pins in the main stacking context
+     so .pin.morphing can stack above .detail-screen */
+}
+
+/* Selected pin during detail — cup morphs to espresso silhouette */
+.pin-espresso {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -55%) scale(0.12);
+  width: 22px; height: 22px;
+  opacity: 0; pointer-events: none;
+  transition: none;
+}
+.pin.morphing .cup {
+  opacity: 0; transform: rotate(45deg) scale(0.25);
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+.pin.morphing .pin-label {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.pin.morphing { z-index: 30; }
+.pin.morphing .pin-espresso {
+  opacity: 1; transform: translate(-50%, -55%) scale(1);
+  transition: opacity 0.38s ease 0.2s,
+              transform 0.44s cubic-bezier(.2,.9,.3,1.1) 0.2s;
+}
+
+/* Reverse — espresso cup fades out, regular cup returns */
+.pin.un-morphing .pin-espresso {
+  opacity: 0; transform: translate(-50%, -55%) scale(0.12);
+  transition: opacity 0.28s ease, transform 0.34s cubic-bezier(.4,0,.6,1);
+}
+.pin.un-morphing .cup {
+  opacity: 1; transform: rotate(45deg) scale(1);
+  transition: opacity 0.3s ease 0.08s,
+              transform 0.36s cubic-bezier(.2,.9,.3,1.1) 0.08s;
+}
+.pin.un-morphing .pin-label {
+  opacity: 1;
+  transition: opacity 0.28s ease 0.12s;
+}
+.grain {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(107,66,38,.09) 1px, transparent 1.5px);
+  background-size: 7px 7px;
+  opacity: .55; mix-blend-mode: multiply;
+}
+
+/* Floating control row — replaces the old dark header */
+.logo-mark {
+  position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 6; pointer-events: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--caramel);
+  border: 2px solid rgba(251,245,234,.5);
+  opacity: .42;
+}
+.filter-ctrl {
+  position: absolute; top: 14px; right: 16px; z-index: 6;
+  display: flex; align-items: center;
+}
+.hdr-btn {
+  width: 38px; height: 38px; border-radius: 13px; border: none;
+  background: rgba(26,16,8,.82); border: 1px solid rgba(251,245,234,.14);
+  color: var(--foam); display: grid; place-items: center; cursor: pointer;
+  transition: background .15s;
+}
+.hdr-btn:hover { background: rgba(26,16,8,.95); }
+.hdr-btn svg { width: 18px; height: 18px; }
+
+/* Location chip */
+.loc-chip {
+  position: absolute; top: 14px; left: 16px;
+  z-index: 6;
+  background: rgba(26,16,8,.82);
+  border: 1px solid rgba(251,245,234,.14); border-radius: 999px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  color: var(--foam); font-size: 13px; font-weight: 600;
+  white-space: nowrap;
+}
+.loc-chip svg { width: 13px; height: 13px; color: var(--caramel); }
+
+/* You-are-here */
+.me-wrap {
+  position: absolute; left: 50%; top: 48%;
+  transform: translate(-50%,-50%);
+  pointer-events: none; z-index: 3;
+}
+.me-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--water); border: 3px solid var(--foam);
+  box-shadow: 0 2px 8px rgba(42,26,16,.4);
+  position: relative; z-index: 2;
+}
+.me-ring {
+  position: absolute; inset: -5px; border-radius: 50%;
+  border: 2px solid var(--water);
+  animation: pulse 2.8s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { transform: scale(1); opacity: .5; }
+  100% { transform: scale(3.6); opacity: 0; }
+}
+
+/* Cup pins */
+.pin {
+  position: absolute; z-index: 4;
+  transform: translate(-50%,-100%);
+  border: none; background: none; cursor: pointer; padding: 0;
+  animation: drop .45s cubic-bezier(.2,.9,.3,1.2) backwards;
+}
+@keyframes drop {
+  from { transform: translate(-50%,-155%); opacity: 0; }
+  to   { transform: translate(-50%,-100%); opacity: 1; }
+}
+.cup {
+  width: 32px; height: 32px;
+  border-radius: 50% 50% 50% 4px; transform: rotate(45deg);
+  background: linear-gradient(160deg, var(--roast-soft), var(--roast));
+  border: 2.5px solid rgba(251,245,234,.88);
+  box-shadow: 0 6px 14px -4px rgba(42,26,16,.55);
+  display: grid; place-items: center;
+  transition: background .2s, transform .22s cubic-bezier(.2,.9,.3,1.2), box-shadow .2s;
+}
+.cup svg { width: 15px; height: 15px; transform: rotate(-45deg); color: var(--foam); }
+.pin:hover .cup, .pin.sel .cup {
+  background: linear-gradient(160deg, var(--caramel), var(--caramel-dk));
+  transform: rotate(45deg) scale(1.16);
+  box-shadow: 0 10px 20px -5px rgba(168,99,31,.6);
+}
+.pin-label {
+  position: absolute; bottom: calc(100% + 10px); left: 50%;
+  transform: translateX(-50%);
+  background: rgba(42,26,16,.72); color: var(--foam);
+  font-family: var(--f-display); font-size: 10px; font-weight: 600;
+  white-space: nowrap; padding: 3px 8px; border-radius: 6px;
+  opacity: 1; pointer-events: none;
+  transition: background .18s ease;
+}
+.pin-label::after {
+  content: ''; position: absolute; top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent; border-top-color: rgba(42,26,16,.72);
+}
+.pin.sel .pin-label {
+  background: var(--espresso);
+}
+.pin.sel .pin-label::after { border-top-color: var(--espresso); }
+.pin-ring {
+  position: absolute; inset: -9px; border-radius: 50%;
+  border: 2px solid var(--caramel);
+  opacity: 0; transform: scale(.65);
+  transition: opacity .25s ease, transform .28s cubic-bezier(.2,.9,.3,1.2);
+  pointer-events: none;
+}
+.pin.sel .pin-ring { opacity: .45; transform: scale(1); }
+
+/* ══════════════════════════════
+   DETAIL SCREEN — bottom sheet over live map
+══════════════════════════════ */
+#detailOverlay {
+  position: absolute; inset: 0; z-index: 24;
+  pointer-events: none; /* enabled when sheet is open */
+}
+.detail-screen {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 60%; z-index: 25;
+  display: flex; flex-direction: column;
+  transform: translateY(100%);
+  transition: transform .42s cubic-bezier(.32,.72,0,1);
+  pointer-events: none;
+}
+.detail-screen.open { transform: translateY(0); pointer-events: auto; }
+
+.detail-sheet {
+  flex: 1; background: var(--foam);
+  border-radius: 22px 22px 0 0;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.detail-handle-row {
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px 16px 0; flex-shrink: 0; position: relative;
+}
+.detail-handle {
+  width: 36px; height: 4px; border-radius: 999px;
+  background: rgba(42,26,16,.18);
+}
+.detail-close {
+  position: absolute; right: 16px; top: 8px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--kraft); border: none; cursor: pointer;
+  display: grid; place-items: center; color: var(--roast);
+}
+.detail-close svg { width: 14px; height: 14px; }
+.detail-content {
+  flex: 1; overflow-y: auto; padding: 16px 22px 28px;
+  scrollbar-width: none; display: flex; flex-direction: column; gap: 12px;
+}
+.detail-content::-webkit-scrollbar { display: none; }
+
+.detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.detail-name { font-family: var(--f-display); font-weight: 600; font-size: 22px; color: var(--espresso); line-height: 1.2; }
+.detail-score-block { text-align: right; flex-shrink: 0; }
+.detail-score { font-family: var(--f-mono); font-size: 20px; font-weight: 700; color: var(--caramel); line-height: 1; }
+.detail-score-ctx { font-family: var(--f-ui); font-size: 10.5px; color: var(--ink-40); margin-top: 4px; line-height: 1.3; white-space: nowrap; }
+.detail-score-ctx b { color: var(--caramel); font-weight: 600; }
+.detail-meta { display: flex; align-items: center; gap: 7px; font-family: var(--f-ui); font-size: 13px; color: var(--ink-40); flex-wrap: wrap; }
+.detail-meta-led { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.detail-pills { display: flex; gap: 7px; flex-wrap: wrap; }
+.detail-pill { font-family: var(--f-ui); font-size: 12px; font-weight: 600; color: var(--roast-soft); background: var(--kraft); border-radius: 7px; padding: 4px 11px; }
+.detail-atmo { display: flex; gap: 7px; flex-wrap: wrap; }
+.detail-atmo-pill {
+  font-family: var(--f-ui); font-size: 12px; font-weight: 600; color: #5f6b46;
+  background: none; border: 1px solid rgba(126,138,94,.4);
+  border-radius: 999px; padding: 4px 12px;
+}
+.detail-origin {
+  background: rgba(107,66,38,.06); border: 1px solid rgba(42,26,16,.1);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.detail-origin-eyebrow {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--f-ui); font-size: 10px; font-weight: 600;
+  letter-spacing: .4px; color: var(--roast); text-transform: uppercase;
+}
+.detail-origin-eyebrow svg { width: 13px; height: 13px; flex-shrink: 0; }
+.detail-origin-name { font-family: var(--f-display); font-weight: 600; font-size: 15px; color: var(--espresso); margin-top: 3px; }
+.detail-origin-meta { font-family: var(--f-ui); font-size: 11px; color: var(--ink-40); margin-top: 1px; }
+.detail-desc { font-family: var(--f-ui); font-size: 13.5px; line-height: 1.62; color: var(--ink-40); border-top: 1px solid rgba(42,26,16,.08); padding-top: 12px; margin: 0; }
+.detail-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 6px; }
+.d-btn-save {
+  flex: 1; height: 46px; border-radius: 13px;
+  border: 1.5px solid rgba(42,26,16,.2); background: none;
+  font-family: var(--f-ui); font-size: 13px; font-weight: 600;
+  color: var(--espresso); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  transition: border-color .15s, color .15s;
+}
+.d-btn-save.saved { border-color: var(--caramel); color: var(--caramel); }
+.d-btn-dir {
+  flex: 2; height: 46px; border-radius: 13px; border: none;
+  background: var(--espresso); font-family: var(--f-ui);
+  font-size: 13px; font-weight: 600; color: var(--foam); cursor: pointer;
+}
+
+/* ══════════════════════════════
+   SAVED SCREEN
+══════════════════════════════ */
+.saved-screen {
+  position: absolute; inset: 0 0 72px 0;
+  background: var(--foam);
+  display: flex; flex-direction: column;
+}
+.saved-hdr { padding: 24px 22px 12px; flex: 0 0 auto; }
+.saved-hdr h2 { font-family: var(--f-display); font-weight: 600; font-size: 26px; color: var(--espresso); }
+.saved-count { font-family: var(--f-ui); font-size: 12.5px; color: var(--ink-40); margin-top: 3px; }
+
+.saved-list {
+  flex: 1; overflow-y: auto; scrollbar-width: none;
+  padding: 6px 18px 24px;
+  display: flex; flex-direction: column; gap: 11px;
+}
+.saved-list::-webkit-scrollbar { display: none; }
+
+.saved-card {
+  background: var(--crema);
+  border: 1px solid rgba(42,26,16,.08);
+  border-radius: 16px;
+  padding: 14px 15px 13px;
+  display: flex; flex-direction: column; gap: 9px;
+  cursor: pointer; text-align: left;
+  transition: transform .18s cubic-bezier(.2,.9,.3,1.2), box-shadow .18s;
+  animation: cardIn .34s cubic-bezier(.2,.9,.3,1.1) backwards;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.saved-card:active { transform: scale(.985); }
+.saved-card:hover { box-shadow: 0 6px 18px -10px rgba(42,26,16,.4); }
+
+/* Collapse-out when unsaved from this screen */
+.saved-card.removing {
+  opacity: 0; transform: translateX(18px);
+  max-height: 0; padding-top: 0; padding-bottom: 0;
+  margin-bottom: -11px; border-width: 0;
+  overflow: hidden;
+  transition: opacity .2s ease, transform .26s ease,
+              max-height .3s ease .04s, padding .3s ease .04s,
+              margin .3s ease .04s;
+}
+
+.saved-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.saved-name { font-family: var(--f-display); font-weight: 600; font-size: 16.5px; color: var(--espresso); line-height: 1.25; }
+.saved-meta {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--f-ui); font-size: 11.5px; color: var(--ink-40);
+  margin-top: 4px;
+}
+.saved-led { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.saved-score { font-family: var(--f-mono); font-size: 17px; font-weight: 700; color: var(--caramel); line-height: 1; text-align: right; }
+.saved-score-lbl { font-family: var(--f-ui); font-size: 9.5px; color: var(--ink-40); margin-top: 3px; white-space: nowrap; }
+
+.saved-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.saved-pill {
+  font-family: var(--f-ui); font-size: 11px; font-weight: 600;
+  color: var(--roast-soft); background: var(--kraft);
+  border-radius: 6px; padding: 3px 9px;
+}
+
+.saved-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border-top: 1px solid rgba(42,26,16,.08); padding-top: 9px;
+}
+.saved-origin {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--f-ui); font-size: 11px; color: var(--ink-40);
+  min-width: 0;
+}
+.saved-origin svg { width: 12px; height: 12px; color: var(--roast); flex-shrink: 0; }
+.saved-origin span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-remove {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  border: none; background: rgba(193,122,53,.12); cursor: pointer;
+  display: grid; place-items: center;
+  transition: background .15s;
+}
+.saved-remove:hover { background: rgba(193,122,53,.24); }
+.saved-remove svg { width: 15px; height: 15px; }
+
+/* Empty state */
+.saved-empty {
+  flex: 1; display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 13px;
+  padding-bottom: 40px;
+}
+.saved-empty.show { display: flex; }
+.saved-empty svg { width: 44px; height: 44px; color: var(--kraft-dk); }
+.saved-empty h3 { font-family: var(--f-display); font-weight: 600; font-size: 19px; color: var(--espresso); }
+.saved-empty p { font-size: 13px; color: var(--ink-40); text-align: center; max-width: 215px; line-height: 1.55; }
+.saved-empty-cta {
+  margin-top: 4px; border: none; background: none; cursor: pointer;
+  font-family: var(--f-ui); font-size: 13px; font-weight: 600; color: var(--caramel);
+}
+
+/* ══════════════════════════════
+   STUB SCREENS
+══════════════════════════════ */
+.stub {
+  position: absolute; inset: 0 0 72px 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 13px;
+  background: var(--foam);
+}
+.stub svg { width: 44px; height: 44px; color: var(--kraft-dk); }
+.stub h2 { font-family: var(--f-display); font-size: 22px; color: var(--espresso); }
+.stub p { font-size: 13.5px; color: var(--ink-40); text-align: center; max-width: 210px; line-height: 1.55; }
+
+/* ══════════════════════════════
+   LIQUID BEZIER NAV
+══════════════════════════════ */
+.lnav {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 72px; z-index: 20;
+}
+
+/* SVG sits flush in the nav bar — the valley notch cuts inward, no extra height needed */
+.lnav-svg {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  width: 100%; height: 72px;
+  overflow: visible;
+}
+
+/* Nav items row sits over the SVG */
+.lnav-items {
+  position: absolute;
+  bottom: 0; left: 0; right: 0; height: 72px;
+  display: flex;
+  overflow: visible;  /* allow icons to rise above */
+}
+.lnav-item {
+  flex: 1; position: relative; border: none; background: none;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+
+/* Icon wrapper — rises to the nav top edge (centre of the coffee bean) on active */
+.lnav-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(251,245,234,.30);
+  transition: transform .52s cubic-bezier(.34,1.56,.64,1),
+              color .22s .08s ease;
+  pointer-events: none;
+}
+.lnav-icon svg { width: 22px; height: 22px; }
+.lnav-item.active .lnav-icon {
+  transform: translateY(calc(-50% - 36px));  /* nav top = bean centre */
+  color: var(--roast);                    /* dark roast icon on latte ball */
+}
+
+/* Label fades in below active icon */
+.lnav-label {
+  position: absolute; bottom: 10px;
+  font-family: var(--f-ui); font-size: 9.5px; font-weight: 700;
+  letter-spacing: .3px;
+  color: rgba(251,245,234,.38);
+  opacity: 0; pointer-events: none;
+  transition: opacity .18s .14s;
+  white-space: nowrap;
+}
+.lnav-item.active .lnav-label { opacity: .65; }
+
+/* Focus / reduced motion */
+.lnav-item:focus-visible .lnav-icon { color: var(--caramel); }
+@media (prefers-reduced-motion: reduce) {
+  *, .me-ring { animation: none !important; transition: none !important; }
+}
+
+/* ══════════════════════════════
+   FILTER PANEL
+══════════════════════════════ */
+.f-active-pill {
+  display: none; align-items: center; gap: 6px;
+  background: rgba(193,122,53,.14); border: 1px solid rgba(193,122,53,.36);
+  border-radius: 999px; padding: 6px 7px 6px 10px;
+  cursor: pointer; color: var(--foam);
+  font-family: var(--f-ui); font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+}
+.f-active-pill.show { display: flex; }
+.f-pill-icon { color: var(--caramel); flex-shrink: 0; display: flex; }
+.f-pill-icon svg { width: 11px; height: 11px; }
+.f-pill-x {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(251,245,234,.1);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; cursor: pointer;
+}
+.f-pill-x svg { width: 7px; height: 7px; }
+
+.f-scrim {
+  position: absolute; inset: 0; z-index: 29;
+  background: rgba(26,16,8,.5);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease;
+}
+.f-scrim.open { opacity: 1; pointer-events: auto; }
+
+.f-panel {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 30;
+  background: var(--foam);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 40px -16px rgba(42,26,16,.4);
+  transform: translateY(100%);
+  transition: transform .42s cubic-bezier(.32,.72,0,1);
+  display: flex; flex-direction: column;
+  max-height: 78%;
+}
+.f-panel.open { transform: translateY(0); }
+
+.f-grip {
+  width: 36px; height: 5px; border-radius: 3px;
+  background: var(--kraft-dk); margin: 10px auto 0; flex: 0 0 auto;
+}
+
+.f-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px 14px; flex: 0 0 auto;
+  border-bottom: 1px solid rgba(42,26,16,.08);
+}
+.f-hdr h3 { font-family: var(--f-display); font-weight: 600; font-size: 20px; color: var(--espresso); }
+.f-clear {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--f-ui); font-size: 13px; font-weight: 600;
+  color: var(--caramel); padding: 4px 2px;
+  opacity: 0; pointer-events: none; transition: opacity .18s;
+}
+.f-clear.show { opacity: 1; pointer-events: auto; }
+
+.f-body {
+  flex: 1; overflow-y: auto; padding: 4px 0 6px;
+  scrollbar-width: none;
+}
+.f-body::-webkit-scrollbar { display: none; }
+
+.f-section { padding: 16px 20px 14px; }
+.f-section + .f-section { border-top: 1px solid rgba(42,26,16,.07); }
+
+.f-lbl {
+  font-family: var(--f-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .7px; text-transform: uppercase;
+  color: var(--ink-40); margin-bottom: 12px; display: block;
+}
+
+.f-row { display: flex; align-items: center; justify-content: space-between; }
+.f-row .f-lbl { margin-bottom: 0; }
+
+/* Toggle switch */
+.f-toggle {
+  width: 44px; height: 26px; border-radius: 999px; border: none;
+  background: var(--kraft-dk); cursor: pointer;
+  position: relative; flex: 0 0 auto;
+  transition: background .22s ease;
+}
+.f-toggle.on { background: var(--caramel); }
+.f-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.18);
+  transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+}
+.f-toggle.on .f-knob { transform: translateX(18px); }
+
+/* Chips */
+.f-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.f-chip {
+  font-family: var(--f-ui); font-size: 13px; font-weight: 600;
+  color: var(--roast); background: var(--crema);
+  border: 1.5px solid transparent; border-radius: 999px;
+  padding: 8px 16px; cursor: pointer;
+  transition: background .14s, border-color .14s, color .14s;
+}
+.f-chip:hover { border-color: var(--kraft-dk); }
+.f-chip.on { background: var(--espresso); color: var(--foam); }
+
+/* Footer */
+.f-foot {
+  padding: 12px 20px 22px; flex: 0 0 auto;
+  border-top: 1px solid rgba(42,26,16,.08);
+}
+.f-apply {
+  width: 100%; padding: 16px; border: none; border-radius: 14px;
+  background: var(--espresso); color: var(--foam);
+  font-family: var(--f-ui); font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: opacity .15s;
+}
+.f-apply:hover { opacity: .86; }
+
+/* Count label inside brew chips */
+.f-chip-ct {
+  font-size: 10px; opacity: .45; margin-left: 3px;
+  font-weight: 400;
+}
+.f-chip.on .f-chip-ct { opacity: .55; }
+
+/* Zero-results apply button */
+.f-apply.zero {
+  background: var(--roast-soft);
+  cursor: default;
+}
+
+
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ── Screen 0: Nearby ── -->
+  <div class="screen active" id="s0">
+    <!-- Map background -->
+    <div class="map-wrap">
+      <!-- Zoom layer — this element scales on pin tap -->
+      <div class="map-zoom-layer" id="mapZoom">
+      <svg class="streets" viewBox="0 0 390 660" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <!-- water strip -->
+        <path d="M-10 54 Q88 88 148 64 Q216 36 318 72 Q378 92 410 72 L410 100 Q378 126 318 104 Q216 72 148 94 Q88 120 -10 86Z"
+              fill="#9DB3A8" opacity=".62"/>
+        <!-- park -->
+        <path d="M244 390 Q298 358 362 376 Q412 394 402 490 L238 490 Q222 440 244 390Z"
+              fill="#cdd5b0"/>
+        <path d="M244 390 Q298 358 362 376 Q412 394 402 490 L238 490 Q222 440 244 390Z"
+              fill="#7E8A5E" opacity=".28"/>
+        <!-- main roads -->
+        <g stroke="#EFE2C7" stroke-width="14" stroke-linecap="round" fill="none">
+          <path d="M38 -8 L64 240 L50 680"/>
+          <path d="M216 -8 L200 252 L228 680"/>
+          <path d="M-8 332 L178 318 L410 336"/>
+          <path d="M-8 508 L196 496 L410 476"/>
+        </g>
+        <!-- side streets -->
+        <g stroke="#E0CDA6" stroke-width="6" stroke-linecap="round" fill="none">
+          <path d="M118 -8 L130 680"/>
+          <path d="M304 -8 L294 340"/>
+          <path d="M-8 194 L196 184 L410 200"/>
+          <path d="M-8 36 L158 26"/>
+          <path d="M-8 418 L196 408 L410 422"/>
+        </g>
+      </svg>
+      <div class="grain"></div>
+
+      <!-- You-are-here -->
+      <div class="me-wrap"><div class="me-ring"></div><div class="me-dot"></div></div>
+
+      <!-- Pins injected by JS -->
+      <div id="pins"></div>
+      </div><!-- end .map-zoom-layer -->
+
+      <!-- Floating controls — sit above the zoom layer, unaffected by scale -->
+
+      <!-- Watermark logo mark -->
+      <div class="logo-mark" aria-hidden="true"></div>
+
+      <!-- Filter controls (floating top-right) -->
+      <div class="filter-ctrl">
+        <button class="hdr-btn" id="filterIconBtn" onclick="openFilters()" aria-label="Filter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="6" x2="20" y2="6"/>
+            <line x1="7" y1="12" x2="17" y2="12"/>
+            <line x1="10" y1="18" x2="14" y2="18"/>
+          </svg>
+        </button>
+        <button class="f-active-pill" id="fActivePill" onclick="openFilters()" aria-label="Edit active filters">
+          <span class="f-pill-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/>
+            </svg>
+          </span>
+          <span id="fPillText"></span>
+          <span class="f-pill-x" onclick="event.stopPropagation();clearFilters()" role="button" aria-label="Clear all filters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(251,245,234,.7)" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </span>
+        </button>
+      </div>
+
+      <!-- Location chip -->
+      <div class="loc-chip">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/>
+        </svg>
+        Mission District
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen 1: Search ── -->
+  <div class="screen" id="s1">
+    <div class="stub">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <h2>Search</h2>
+      <p>Find by name, brew method, or neighbourhood</p>
+    </div>
+  </div>
+
+  <!-- ── Screen 2: Saved ── -->
+  <div class="screen" id="s2">
+    <div class="saved-screen">
+      <div class="saved-hdr">
+        <h2>Saved</h2>
+        <div class="saved-count" id="savedCount"></div>
+      </div>
+      <div class="saved-list" id="savedList"></div>
+      <div class="saved-empty" id="savedEmpty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <h3>Nothing saved yet</h3>
+        <p>Tap the heart on any spot to keep it here for later.</p>
+        <button class="saved-empty-cta" onclick="navTo(0)">Browse nearby →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Screen 3: You ── -->
+  <div class="screen" id="s3">
+    <div class="stub">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <h2>You</h2>
+      <p>Brew preferences and cup score history</p>
+    </div>
+  </div>
+
+  <!-- ══ Liquid Bezier Nav ══ -->
+  <nav class="lnav" aria-label="Main navigation">
+    <!-- Single SVG path = the entire nav bar shape, bump included -->
+    <svg class="lnav-svg" id="lnavSvg"
+         viewBox="0 0 390 72" preserveAspectRatio="none" aria-hidden="true">
+      <!-- Nav bar with valley notch -->
+      <path id="lnavBlob" fill="#1a1008"/>
+      <!-- Latte ball anchor -->
+      <g id="navBean">
+        <circle r="20" fill="#D4B896"/>
+        <ellipse cx="-5" cy="-6" rx="7" ry="5"
+                 fill="rgba(255,255,255,.28)" transform="rotate(-30,-5,-6)"/>
+      </g>
+    </svg>
+
+    <div class="lnav-items" id="lnavItems">
+
+      <button class="lnav-item active" data-s="s0" aria-label="Nearby">
+        <span class="lnav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/>
+            <circle cx="12" cy="9" r="2.5"/>
+          </svg>
+        </span>
+        <span class="lnav-label">Nearby</span>
+      </button>
+
+      <button class="lnav-item" data-s="s1" aria-label="Search">
+        <span class="lnav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+        </span>
+        <span class="lnav-label">Search</span>
+      </button>
+
+      <button class="lnav-item" data-s="s2" aria-label="Saved">
+        <span class="lnav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+        </span>
+        <span class="lnav-label">Saved</span>
+      </button>
+
+      <button class="lnav-item" data-s="s3" aria-label="You">
+        <span class="lnav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </span>
+        <span class="lnav-label">You</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- ── Tap-to-dismiss overlay (sits below sheet, above map) ── -->
+  <div id="detailOverlay" onclick="closeDetail()"></div>
+
+  <!-- ── Detail sheet — floats over live map ── -->
+  <div class="detail-screen" id="detailScreen">
+    <div class="detail-sheet">
+      <div class="detail-handle-row">
+        <div class="detail-handle"></div>
+        <button class="detail-close" onclick="closeDetail()" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="detail-content">
+        <div class="detail-header">
+          <span class="detail-name" id="detailName"></span>
+          <div class="detail-score-block">
+            <div class="detail-score" id="detailScore"></div>
+            <div class="detail-score-ctx" id="detailScoreCtx"></div>
+          </div>
+        </div>
+        <div class="detail-meta" id="detailMeta"></div>
+        <div class="detail-pills" id="detailPills"></div>
+        <div class="detail-atmo" id="detailAtmo"></div>
+        <div class="detail-origin" id="detailOrigin">
+          <div class="detail-origin-eyebrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="6.5" ry="8.5" transform="rotate(18 12 12)"/><path d="M9 5.5 Q13 12 9 18.5" transform="rotate(18 12 12)"/></svg>
+            Currently pouring
+          </div>
+          <div class="detail-origin-name" id="detailOriginName"></div>
+          <div class="detail-origin-meta" id="detailOriginMeta"></div>
+        </div>
+        <p class="detail-desc" id="detailDesc"></p>
+        <div class="detail-actions">
+          <button class="d-btn-save" id="dBtnSave" onclick="toggleSave()">
+            <svg id="saveHeart" width="19" height="19" viewBox="0 0 24 24" style="display:block;flex-shrink:0">
+              <defs>
+                <clipPath id="saveClip">
+                  <rect id="saveRect" x="0" y="24" width="24" height="24"/>
+                </clipPath>
+              </defs>
+              <path id="saveOutline" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                fill="none" stroke="#2A1A10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                fill="#C17A35" clip-path="url(#saveClip)"/>
+            </svg>
+            <span id="saveLbl">Save</span>
+          </button>
+          <button class="d-btn-dir">Get directions →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Scrim ── -->
+  <div class="f-scrim" id="fScrim" onclick="closeFilters()"></div>
+
+  <!-- ── Filter panel ── -->
+  <div class="f-panel" id="fPanel" role="dialog" aria-label="Filters">
+    <div class="f-grip"></div>
+    <div class="f-hdr">
+      <h3>Filters</h3>
+      <button class="f-clear" id="fClear" onclick="clearFilters()">Clear all</button>
+    </div>
+    <div class="f-body">
+
+      <!-- Open now -->
+      <div class="f-section">
+        <div class="f-row">
+          <span class="f-lbl">Open now</span>
+          <button class="f-toggle" id="togOpen" role="switch" aria-checked="false">
+            <span class="f-knob"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Brew method -->
+      <div class="f-section">
+        <div class="f-lbl">Brew method</div>
+        <div class="f-chips" id="fBrewChips"></div>
+      </div>
+
+      <!-- Cup score -->
+      <div class="f-section">
+        <div class="f-lbl">Minimum cup score</div>
+        <div class="f-chips">
+          <button class="f-chip on" data-score="0">Any</button>
+          <button class="f-chip" data-score="85">85+</button>
+          <button class="f-chip" data-score="90">90+</button>
+          <button class="f-chip" data-score="95">95+</button>
+        </div>
+      </div>
+
+      <!-- Price -->
+      <div class="f-section">
+        <div class="f-lbl">Price</div>
+        <div class="f-chips">
+          <button class="f-chip" data-price="$">$</button>
+          <button class="f-chip" data-price="$$">$$</button>
+          <button class="f-chip" data-price="$$$">$$$</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="f-foot">
+      <button class="f-apply" id="fApply" onclick="closeFilters()">Show 6 spots</button>
+    </div>
+  </div>
+
+</div>
+<script>
+/* ─── Shop data ─── */
+const SHOPS = [
+  { id:1, name:'The Slow Pour',    score:93, dist:210, walk:3,  open:true,  hours:'Open until 6 pm',
+    brews:['Pour-over','V60'],        price:'$$$', x:'27%', y:'43%',
+    atmo:['Quiet','No laptops'],
+    origin:'Ethiopia, Guji', process:'Washed', trade:['Direct trade','Organic'],
+    desc:'Meticulous pour-over bar with rotating single-origins from small roasters. No laptops, no rush.' },
+  { id:2, name:'Foam & Folly',     score:89, dist:360, walk:5,  open:true,  hours:'Open until 8 pm',
+    brews:['Espresso','Cold brew'],   price:'$$',  x:'63%', y:'35%',
+    atmo:['Lively','Dog-friendly'],
+    origin:'Brazil, Cerrado', process:'Natural', trade:['Rainforest Alliance'],
+    desc:'Playful neighbourhood spot known for creative seasonal drinks and an always-welcoming crowd.' },
+  { id:3, name:'Ember & Oak',      score:91, dist:420, walk:6,  open:true,  hours:'Open until 5 pm',
+    brews:['Espresso','AeroPress'],   price:'$$',  x:'46%', y:'58%',
+    atmo:['Cozy','Laptop friendly'],
+    origin:'Guatemala, Antigua', process:'Washed', trade:['Fair trade'],
+    desc:'Warm wood-panelled interior and some of the most technically precise milk drinks in the area.' },
+  { id:4, name:'Maven Roasters',   score:94, dist:650, walk:9,  open:true,  hours:'Open until 7 pm',
+    brews:['Single-origin','Siphon'], price:'$$$', x:'75%', y:'65%',
+    atmo:['Educational','Counter seating'],
+    origin:'Panama, Boquete', process:'Washed', trade:['Direct trade'],
+    desc:'Small-batch roaster and café pushing the limits of extraction. Every cup is a lesson.' },
+  { id:5, name:'Drift Coffee Bar', score:87, dist:290, walk:4,  open:false, hours:'Opens at 8 am',
+    brews:['Cold brew','Espresso'],   price:'$$',  x:'32%', y:'73%',
+    atmo:['Outdoor seating','Dog-friendly'],
+    origin:'Honduras, Marcala', process:'Honey', trade:['Organic'],
+    desc:'Laid-back bar built around slow cold-brew and flash-chilled drinks. Best patio in the neighbourhood.' },
+  { id:6, name:'Kettle & Stone',   score:90, dist:500, walk:7,  open:true,  hours:'Open until 6 pm',
+    brews:['Chemex','Pour-over'],     price:'$$$', x:'18%', y:'64%',
+    atmo:['Quiet','Minimalist'],
+    origin:'Kenya, Nyeri', process:'Washed', trade:['Direct trade'],
+    desc:'Serene and minimalist, with a no-laptop policy and the longest steep times on the block.' },
+];
+
+
+
+const ESPRESSO_SVG = `<svg class="pin-espresso" viewBox="0 0 58 58" aria-hidden="true">
+  <ellipse cx="29" cy="50" rx="21" ry="4.5" fill="#FBF5EA"/>
+  <path d="M18 24 L38 24 L36 44 Q36 48 32 48 L24 48 Q20 48 18.5 44 Z" fill="#C17A35"/>
+  <ellipse cx="28" cy="24.5" rx="9.5" ry="2.3" fill="#2A1A10" opacity="0.45"/>
+  <path d="M36 29 Q44 29 44 34.5 Q44 40 36 40" fill="none" stroke="#C17A35" stroke-width="4" stroke-linecap="round"/>
+</svg>`;
+
+const CUP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 9h11v4a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9z"/>
+  <path d="M16 10h2.2a2 2 0 1 1 0 4H16"/>
+  <path d="M8 3v2M11.5 3v2"/>
+</svg>`;
+
+let selId = null;
+
+/* ─── Pins ─── */
+const pinsEl = document.getElementById('pins');
+[...SHOPS].sort((a,b) => a.dist-b.dist).forEach((s, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'pin';
+  btn.id = `pin-${s.id}`;
+  btn.style.cssText = `left:${s.x};top:${s.y};animation-delay:${i*60}ms`;
+  btn.setAttribute('aria-label', s.name);
+  btn.innerHTML = `<span class="pin-ring"></span><span class="cup">${CUP_ICON}</span><span class="pin-label">${s.name}</span>${ESPRESSO_SVG}`;
+  btn.addEventListener('click', () => openDetail(s.id));
+  pinsEl.appendChild(btn);
+});
+
+
+/* Cup-score language follows real specialty-coffee cupping conventions */
+function scoreLabel(score) {
+  if (score >= 90) return 'Outstanding';
+  if (score >= 85) return 'Excellent';
+  if (score >= 80) return 'Very good';
+  return 'Good';
+}
+const topScore = Math.max(...SHOPS.map(s => s.score));
+
+let detailOpen = false;
+
+function openDetail(id) {
+  if (detailOpen) return; /* guard against mid-animation double-tap */
+  detailOpen = true;
+  const s = SHOPS.find(sh => sh.id === id);
+  if (!s) return;
+
+  /* ── 1. Zoom map toward tapped pin, centering it in the viewport ── */
+  const zl = document.getElementById('mapZoom');
+  const S  = 2.4;
+  const px = parseFloat(s.x), py = parseFloat(s.y);
+  /* Centre the pin within the visible 40% above the sheet.
+     Sheet top is at 40%, so the visible midpoint is 20% from top.
+     Formula: dy = (target_y - 50) / S + 50 - py  →  dy = 37.5 - py */
+  const dx = 50 - px;
+  const dy = 37.5 - py;
+  zl.style.transformOrigin = '50% 50%';
+  zl.style.transform = `scale(${S}) translate(${dx}%, ${dy}%)`;
+
+  /* ── 2. Fade all other pins to invisible ── */
+  document.querySelectorAll('.pin').forEach(p => {
+    if (p.id !== `pin-${id}`) {
+      p.style.transition = 'opacity 0.38s ease';
+      p.style.opacity = '0';
+    }
+  });
+
+  /* ── 3. Morph selected pin → espresso cup ── */
+  const sel = document.getElementById(`pin-${id}`);
+  if (sel) sel.classList.add('morphing');
+
+  /* ── 4. Populate detail content ── */
+  currentDetailId = id;
+  document.getElementById('detailName').textContent  = s.name;
+  document.getElementById('detailScore').textContent = s.score;
+
+  const label = scoreLabel(s.score);
+  document.getElementById('detailScoreCtx').innerHTML = s.score === topScore
+    ? `<b>${label}</b> · highest-rated nearby`
+    : `<b>${label}</b> · specialty grade`;
+
+  const ledColor = s.open ? 'var(--sage)' : 'var(--clay)';
+  document.getElementById('detailMeta').innerHTML =
+    `<span class="detail-meta-led" style="background:${ledColor}"></span>
+     ${s.hours} &nbsp;·&nbsp; ${s.walk} min · ${s.dist}m`;
+
+  document.getElementById('detailPills').innerHTML =
+    s.brews.map(b => `<span class="detail-pill">${b}</span>`).join('') +
+    (s.price ? `<span class="detail-pill">${s.price}</span>` : '');
+
+  document.getElementById('detailAtmo').innerHTML =
+    s.atmo.map(a => `<span class="detail-atmo-pill">${a}</span>`).join('');
+
+  document.getElementById('detailOriginName').textContent = s.origin;
+  document.getElementById('detailOriginMeta').textContent =
+    `${s.process} process · ${s.trade.join(' · ')}`;
+
+  document.getElementById('detailDesc').textContent = s.desc;
+
+  /* Reset heart to match saved state for this shop */
+  const alreadySaved = savedIds.has(id);
+  document.getElementById('saveRect').setAttribute('y', alreadySaved ? '0' : '24');
+  document.getElementById('saveOutline').setAttribute('stroke', alreadySaved ? '#C17A35' : '#2A1A10');
+  document.getElementById('dBtnSave').classList.toggle('saved', alreadySaved);
+  document.getElementById('saveLbl').textContent = alreadySaved ? 'Saved' : 'Save';
+  const sh = document.getElementById('saveHeart');
+  sh.style.transition = 'none'; sh.style.transform = 'scale(1)';
+
+  /* ── 5. Enable the tap-to-dismiss overlay ── */
+  document.getElementById('detailOverlay').style.pointerEvents = 'auto';
+
+  /* ── 5. Rise the sheet after zoom has settled ── */
+  setTimeout(() => {
+    document.getElementById('detailScreen').classList.add('open');
+  }, 340);
+}
+
+function closeDetail() {
+  if (!detailOpen) return;
+  const selPin = document.querySelector('.pin.morphing');
+
+  /* ── 1. Sheet slides down, overlay disabled immediately ── */
+  document.getElementById('detailScreen').classList.remove('open');
+  document.getElementById('detailOverlay').style.pointerEvents = 'none';
+
+  /* ── 2. While sheet descends: zoom out + un-morph + restore pins ── */
+  setTimeout(() => {
+
+    /* Zoom back out toward the user's location (me-dot at 50%, 48%) */
+    const zl = document.getElementById('mapZoom');
+    zl.style.transformOrigin = '50% 50%';
+    zl.style.transform = `scale(1) translate(0%, 2%)`;
+
+    /* Snap fully neutral after zoom settles, using double rAF to
+       guarantee a real frame between disabling and re-enabling transition */
+    setTimeout(() => {
+      zl.style.transition = 'none';
+      zl.style.transform = '';
+      zl.style.transformOrigin = '';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        zl.style.transition = '';
+      }));
+    }, 700);
+
+    /* Un-morph pin */
+    if (selPin) {
+      selPin.classList.add('un-morphing');
+      selPin.classList.remove('morphing');
+      setTimeout(() => selPin.classList.remove('un-morphing'), 480);
+    }
+
+    /* Fade all pins back, then reapply any active filter dimming */
+    document.querySelectorAll('.pin').forEach(p => {
+      p.style.transition = 'opacity 0.42s ease';
+      p.style.opacity = '';
+    });
+    setTimeout(() => {
+      document.querySelectorAll('.pin').forEach(p => p.style.transition = '');
+      applyToMap(); /* reapply filter-based opacity if filters are active */
+      detailOpen = false;
+    }, 500);
+
+  }, 200);
+}
+
+/* ═══════════════════════════════════════
+   CUT-IN VALLEY NAV — spring physics
+═══════════════════════════════════════ */
+const blobEl  = document.getElementById('lnavBlob');
+const beanEl  = document.getElementById('navBean');
+
+const VW    = 390;
+const NAV_H = 72;
+const TAB_X = [VW/8, VW*3/8, VW*5/8, VW*7/8];
+
+let bx = TAB_X[0], bv = 0, tgt = TAB_X[0], rafId = null;
+
+function drawValley(x, vel) {
+  const spd   = Math.min(Math.abs(vel) / 9, 1);
+  const HW    = 46 + spd * 24;          // half-width: widens during travel
+  const DEPTH = 28 * (1 - spd * 0.38); // depth: shallows during travel (squish)
+  const L = Math.max(0,   x - HW);
+  const R = Math.min(VW,  x + HW);
+
+  // Nav bar with a smooth bezier notch cut into the top edge at x
+  const d = [
+    `M 0 ${NAV_H}`,
+    `V 0`,
+    `H ${L}`,
+    `C ${x - HW*0.55} 0, ${x} ${DEPTH*0.55}, ${x} ${DEPTH}`,
+    `C ${x} ${DEPTH*0.55}, ${x + HW*0.55} 0, ${R} 0`,
+    `H ${VW}`,
+    `V ${NAV_H} Z`,
+  ].join(' ');
+
+  blobEl.setAttribute('d', d);
+  // Coffee bean rides at the valley centre — always pegged to the nav top edge
+  beanEl.setAttribute('transform', `translate(${x}, 0)`);
+}
+
+function springTick() {
+  const force = (tgt - bx) * 0.09;
+  bv = bv * 0.70 + force;
+  bx += bv;
+  drawValley(bx, bv);
+
+  if (Math.abs(bx - tgt) > 0.3 || Math.abs(bv) > 0.15) {
+    rafId = requestAnimationFrame(springTick);
+  } else {
+    bx = tgt; bv = 0;
+    drawValley(bx, 0);
+    rafId = null;
+  }
+}
+
+function navTo(idx) {
+  tgt = TAB_X[idx];
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(springTick);
+
+  document.querySelectorAll('.lnav-item').forEach((el, i) =>
+    el.classList.toggle('active', i === idx));
+  document.querySelectorAll('.screen').forEach(el =>
+    el.classList.remove('active'));
+  document.getElementById(['s0','s1','s2','s3'][idx])?.classList.add('active');
+
+  if (idx === 2) renderSaved(); /* replay the card entrance on each visit */
+}
+
+// Wire up tabs
+document.querySelectorAll('.lnav-item').forEach((btn, i) =>
+  btn.addEventListener('click', () => navTo(i)));
+
+// Init — draw valley without animation
+drawValley(bx, 0);
+
+/* ═══════════════════════════════════════
+   SAVE — heart fill animation + localStorage
+═══════════════════════════════════════ */
+let savedIds = new Set(JSON.parse(localStorage.getItem('groundsSaved') || '[]'));
+let saveAnimating = false, saveStateTriggered = false, currentDetailId = null;
+
+function easeOutSine(t) { return Math.sin((t * Math.PI) / 2); }
+
+function toggleSave() {
+  if (saveAnimating) return;
+  savedIds.has(currentDetailId) ? unsaveHeart() : animateSaveHeart();
+}
+
+function animateSaveHeart() {
+  saveAnimating = true;
+  saveStateTriggered = false;
+  const rect    = document.getElementById('saveRect');
+  const outline = document.getElementById('saveOutline');
+  const dur = 420, start = performance.now();
+
+  /* Stroke flips to caramel synchronously on tap — zero perceived delay */
+  outline.setAttribute('stroke', '#C17A35');
+
+  function step(now) {
+    const t    = Math.min((now - start) / dur, 1);
+    const ease = easeOutSine(t);
+    rect.setAttribute('y', 24 * (1 - ease));
+    if (ease >= 0.95) triggerSaved();
+    if (t < 1) { requestAnimationFrame(step); }
+    else { rect.setAttribute('y', 0); triggerSaved(); saveAnimating = false; }
+  }
+  requestAnimationFrame(step);
+}
+
+function persistSaved() {
+  localStorage.setItem('groundsSaved', JSON.stringify([...savedIds]));
+}
+
+function triggerSaved() {
+  if (saveStateTriggered) return;
+  saveStateTriggered = true;
+  savedIds.add(currentDetailId);
+  persistSaved();
+  renderSaved();
+  document.getElementById('dBtnSave').classList.add('saved');
+  document.getElementById('saveLbl').textContent = 'Saved';
+  const svg = document.getElementById('saveHeart');
+  svg.style.transition = 'none';
+  svg.style.transform = 'scale(1.26)';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    svg.style.transition = 'transform .22s cubic-bezier(.2,.9,.3,1.15)';
+    svg.style.transform = 'scale(1)';
+  }));
+}
+
+function unsaveHeart() {
+  if (saveAnimating) return;
+  saveAnimating = true;
+
+  savedIds.delete(currentDetailId);
+  persistSaved();
+  renderSaved();
+
+  const rect    = document.getElementById('saveRect');
+  const outline = document.getElementById('saveOutline');
+  const btn     = document.getElementById('dBtnSave');
+  const lbl     = document.getElementById('saveLbl');
+  const svg     = document.getElementById('saveHeart');
+  const dur     = 420, start = performance.now();
+  let stateDone = false;
+
+  function step(now) {
+    const t    = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.cos((t * Math.PI) / 2); /* ease-in-sine: slow start, rushes out */
+    rect.setAttribute('y', 24 * ease);
+
+    /* Flip label + border when fill is nearly gone */
+    if (!stateDone && ease >= 0.88) {
+      stateDone = true;
+      outline.setAttribute('stroke', '#2A1A10');
+      btn.classList.remove('saved');
+      lbl.textContent = 'Save';
+    }
+
+    if (t < 1) { requestAnimationFrame(step); }
+    else {
+      rect.setAttribute('y', 24);
+      outline.setAttribute('stroke', '#2A1A10');
+      btn.classList.remove('saved');
+      lbl.textContent = 'Save';
+      svg.style.transform = 'scale(1)';
+      saveAnimating = false;
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+/* ═══════════════════════════════════════
+   SAVED SCREEN — renders from savedIds
+═══════════════════════════════════════ */
+const BEAN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="6.5" ry="8.5" transform="rotate(18 12 12)"/><path d="M9 5.5 Q13 12 9 18.5" transform="rotate(18 12 12)"/></svg>`;
+
+const HEART_FILLED = `<svg viewBox="0 0 24 24" fill="#C17A35"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+
+/* Most recently saved first — Sets preserve insertion order */
+function savedShops() {
+  return [...savedIds].reverse()
+    .map(id => SHOPS.find(s => s.id === id))
+    .filter(Boolean);
+}
+
+function renderSaved() {
+  const list  = document.getElementById('savedList');
+  const empty = document.getElementById('savedEmpty');
+  const count = document.getElementById('savedCount');
+  if (!list) return;
+
+  const shops = savedShops();
+  count.textContent = shops.length
+    ? `${shops.length} spot${shops.length !== 1 ? 's' : ''} · Mission District`
+    : '';
+  empty.classList.toggle('show', shops.length === 0);
+  list.style.display = shops.length ? '' : 'none';
+  list.innerHTML = '';
+
+  shops.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'saved-card';
+    card.style.animationDelay = `${i * 45}ms`;
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', `${s.name}, cup score ${s.score}`);
+    card.innerHTML = `
+      <div class="saved-card-top">
+        <div>
+          <div class="saved-name">${s.name}</div>
+          <div class="saved-meta">
+            <span class="saved-led" style="background:${s.open ? 'var(--sage)' : 'var(--clay)'}"></span>
+            ${s.hours} · ${s.walk} min · ${s.dist}m
+          </div>
+        </div>
+        <div>
+          <div class="saved-score">${s.score}</div>
+          <div class="saved-score-lbl">${scoreLabel(s.score)}</div>
+        </div>
+      </div>
+      <div class="saved-pills">
+        ${s.brews.map(b => `<span class="saved-pill">${b}</span>`).join('')}
+        <span class="saved-pill">${s.price}</span>
+      </div>
+      <div class="saved-foot">
+        <div class="saved-origin">${BEAN_ICON}<span>${s.origin} · ${s.process}</span></div>
+        <button class="saved-remove" aria-label="Remove ${s.name} from saved">${HEART_FILLED}</button>
+      </div>`;
+
+    card.addEventListener('click', () => openSavedShop(s.id));
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSavedShop(s.id); }
+    });
+    card.querySelector('.saved-remove').addEventListener('click', e => {
+      e.stopPropagation();
+      removeSavedShop(s.id, card);
+    });
+    list.appendChild(card);
+  });
+}
+
+/* Tapping a card returns to the map and opens that shop's detail sheet */
+function openSavedShop(id) {
+  navTo(0);
+  setTimeout(() => openDetail(id), 240);
+}
+
+/* Unsave from the list — collapse the card out, then re-render */
+function removeSavedShop(id, card) {
+  if (card.classList.contains('removing')) return;
+  savedIds.delete(id);
+  persistSaved();
+
+  card.style.maxHeight = `${card.offsetHeight}px`;
+  requestAnimationFrame(() => card.classList.add('removing'));
+  setTimeout(renderSaved, 320);
+}
+
+renderSaved();
+
+/* ═══════════════════════════════════════
+   FILTER PANEL
+═══════════════════════════════════════ */
+const fState = { openNow: false, brews: new Set(), minScore: 0, price: new Set() };
+
+/* Brew chips — built from shop data, each shows how many shops carry that method */
+const allBrews = [...new Set(SHOPS.flatMap(s => s.brews))].sort();
+const brewWrap  = document.getElementById('fBrewChips');
+allBrews.forEach(brew => {
+  const count = SHOPS.filter(s => s.brews.includes(brew)).length;
+  const btn = document.createElement('button');
+  btn.className = 'f-chip'; btn.dataset.brew = brew;
+  btn.innerHTML = `${brew}<span class="f-chip-ct">(${count})</span>`;
+  btn.addEventListener('click', () => {
+    fState.brews.has(brew) ? fState.brews.delete(brew) : fState.brews.add(brew);
+    btn.classList.toggle('on', fState.brews.has(brew));
+    onFilterChange();
+  });
+  brewWrap.appendChild(btn);
+});
+
+/* Open now toggle */
+document.getElementById('togOpen').addEventListener('click', function () {
+  fState.openNow = !fState.openNow;
+  this.classList.toggle('on', fState.openNow);
+  this.setAttribute('aria-checked', fState.openNow);
+  onFilterChange();
+});
+
+/* Score chips (single-select) */
+document.querySelectorAll('[data-score]').forEach(btn => {
+  btn.addEventListener('click', function () {
+    fState.minScore = +this.dataset.score;
+    document.querySelectorAll('[data-score]').forEach(b => b.classList.remove('on'));
+    this.classList.add('on');
+    onFilterChange();
+  });
+});
+
+/* Price chips (multi-select) */
+document.querySelectorAll('[data-price]').forEach(btn => {
+  btn.addEventListener('click', function () {
+    const p = this.dataset.price;
+    fState.price.has(p) ? fState.price.delete(p) : fState.price.add(p);
+    this.classList.toggle('on', fState.price.has(p));
+    onFilterChange();
+  });
+});
+
+function getFiltered() {
+  return SHOPS.filter(s => {
+    if (fState.openNow && !s.open) return false;
+    if (fState.brews.size  > 0 && !s.brews.some(b => fState.brews.has(b))) return false;
+    if (fState.minScore    > 0 && s.score < fState.minScore) return false;
+    if (fState.price.size  > 0 && !fState.price.has(s.price)) return false;
+    return true;
+  });
+}
+
+function activeFilterCount() {
+  return (fState.openNow ? 1 : 0) +
+         fState.brews.size +              // each selected brew counts individually
+         (fState.minScore > 0 ? 1 : 0) +
+         fState.price.size;               // each selected price tier counts individually
+}
+
+function filterSummaryText() {
+  const parts = [];
+  if (fState.brews.size === 1)    parts.push([...fState.brews][0]);
+  else if (fState.brews.size > 1) parts.push(`${[...fState.brews][0]} +${fState.brews.size - 1}`);
+  if (fState.openNow)             parts.push('Open now');
+  if (fState.minScore > 0)        parts.push(`${fState.minScore}+`);
+  if (fState.price.size > 0)      parts.push([...fState.price].join('/'));
+  return parts.slice(0, 2).join(' · ');
+}
+
+function onFilterChange() {
+  const n        = activeFilterCount();
+  const filtered = getFiltered();
+  const applyBtn = document.getElementById('fApply');
+
+  if (filtered.length === 0) {
+    applyBtn.textContent = 'No spots match — clear filters';
+    applyBtn.classList.add('zero');
+    applyBtn.onclick = clearFilters;
+  } else {
+    applyBtn.textContent = `Show ${filtered.length} spot${filtered.length !== 1 ? 's' : ''}`;
+    applyBtn.classList.remove('zero');
+    applyBtn.onclick = closeFilters;
+  }
+
+  document.getElementById('fClear').classList.toggle('show', n > 0);
+
+  // Switch header between icon button and active filter pill
+  const hasFilters = n > 0;
+  document.getElementById('filterIconBtn').style.display = hasFilters ? 'none' : '';
+  const pill = document.getElementById('fActivePill');
+  pill.classList.toggle('show', hasFilters);
+  if (hasFilters) document.getElementById('fPillText').textContent = filterSummaryText();
+}
+
+function applyToMap() {
+  const filteredIds = new Set(getFiltered().map(s => s.id));
+  document.querySelectorAll('.pin').forEach(p => {
+    const id = +p.id.replace('pin-', '');
+    p.style.opacity      = filteredIds.has(id) ? '1' : '0.18';
+    p.style.pointerEvents = filteredIds.has(id) ? 'auto' : 'none';
+  });
+}
+
+function openFilters() {
+  onFilterChange();
+  document.getElementById('fPanel').classList.add('open');
+  document.getElementById('fScrim').classList.add('open');
+}
+
+function closeFilters() {
+  document.getElementById('fPanel').classList.remove('open');
+  document.getElementById('fScrim').classList.remove('open');
+  applyToMap();
+}
+
+function clearFilters() {
+  fState.openNow = false; fState.brews.clear();
+  fState.minScore = 0; fState.price.clear();
+  document.getElementById('togOpen').classList.remove('on');
+  document.getElementById('togOpen').setAttribute('aria-checked', false);
+  document.querySelectorAll('[data-score]').forEach(b => b.classList.remove('on'));
+  document.querySelector('[data-score="0"]').classList.add('on');
+  document.querySelectorAll('[data-price]').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('[data-brew]').forEach(b => b.classList.remove('on'));
+  onFilterChange();
+  applyToMap(); // always sync the map when clearing, even from outside the panel
+}
+</script>
+</body>
+</html>
