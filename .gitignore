@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.next/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+
+# Generated Prisma client — rebuilt by `prisma generate`, includes binaries.
+packages/db/generated/
