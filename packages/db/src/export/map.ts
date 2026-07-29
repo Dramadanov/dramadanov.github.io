@@ -22,6 +22,8 @@ export interface DbClaimRow {
   source: { id: string; name: string; kind: SourceKind; trustTier: number };
   sourceUrl: string;
   capturedAt: Date;
+  contentHash: string | null;
+  archiveUrl: string | null;
   verifiedBy: string | null;
   verifiedAt: Date | null;
 }
@@ -37,6 +39,8 @@ export interface DbBarrierRow {
   workaroundRecipeId: string | null;
   sourceUrl: string;
   capturedAt: Date;
+  contentHash: string | null;
+  archiveUrl: string | null;
 }
 
 export interface DbRecipeStepRow {
@@ -120,6 +124,8 @@ function mapClaim(row: DbClaimRow, gameName: string): FeatureClaim {
   };
 
   if (row.note !== null) claim.note = row.note;
+  if (row.contentHash !== null) claim.contentHash = row.contentHash;
+  if (row.archiveUrl !== null) claim.archiveUrl = row.archiveUrl;
   if (row.verifiedBy !== null) claim.verifiedBy = row.verifiedBy;
   if (row.verifiedAt !== null) claim.verifiedAt = row.verifiedAt.toISOString();
 
@@ -184,6 +190,9 @@ function mapBarrier(
     sourceUrl,
     capturedAt: capturedAt.toISOString(),
   };
+
+  if (row.contentHash !== null) barrier.contentHash = row.contentHash;
+  if (row.archiveUrl !== null) barrier.archiveUrl = row.archiveUrl;
 
   // A workaround only counts if the recipe actually ships. Pointing at an
   // unpublished recipe would let the engine treat a HARD barrier as neutralised

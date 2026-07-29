@@ -46,6 +46,8 @@ export interface ExportedTaxonomyTag {
   source: string;
   sourceUrl: string;
   capturedAt: string;
+  archiveUrl?: string;
+  contentHash?: string;
 }
 
 export interface ExportedBarrierTag {
@@ -57,6 +59,8 @@ export interface ExportedBarrierTag {
   impactsTaxonomySlugs: string[];
   sourceUrl: string;
   capturedAt: string;
+  archiveUrl?: string;
+  contentHash?: string;
 }
 
 export interface ChunkRef {

@@ -8,6 +8,12 @@
  * prevent. If the fetch fails, seeding fails, loudly.
  */
 
+import {
+  captureSource,
+  type CaptureOptions,
+  type CapturedSource,
+} from './capture.js';
+
 export const AGI_TAG_SOURCES = [
   {
     name: 'Accessible Games Initiative — Tags',
@@ -32,6 +38,10 @@ export interface FetchedTag {
   sourceUrl: string;
   /** ISO timestamp of the fetch. */
   capturedAt: string;
+  /** sha256 of the page this tag was read from. */
+  contentHash: string;
+  /** Immutable copy of that page, when one could be made. */
+  archiveUrl?: string;
 }
 
 export class TaxonomySourceUnavailableError extends Error {
@@ -57,28 +67,19 @@ export function slugify(label: string): string {
 }
 
 /**
- * Fetch and parse one source page.
+ * Fetch one source page and capture it.
  *
- * Deliberately left as an explicit TODO rather than a guessed selector: the
- * page structure has not been observed from this environment (outbound access
- * to accessiblegames.com and learn.microsoft.com is blocked by the network
- * policy here), and writing a parser against an imagined DOM would produce
- * silently wrong rows. Run this from an environment with network access,
- * inspect the markup, then implement the extraction.
+ * Capture, not just fetch: the page is hashed and pushed to an archive so that
+ * every tag row remains checkable after the source moves or changes. A URL alone
+ * is a promise that something was once readable at an address.
  */
-export async function fetchTagPage(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: { accept: 'text/html' },
-  }).catch((cause: unknown) => {
+export async function fetchTagPage(
+  url: string,
+  options: CaptureOptions = {},
+): Promise<CapturedSource> {
+  try {
+    return await captureSource(url, { archive: true, ...options });
+  } catch (cause: unknown) {
     throw new TaxonomySourceUnavailableError(url, cause);
-  });
-
-  if (!response.ok) {
-    throw new TaxonomySourceUnavailableError(
-      url,
-      new Error(`HTTP ${response.status}`),
-    );
   }
-
-  return response.text();
 }

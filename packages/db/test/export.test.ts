@@ -32,6 +32,8 @@ function claimRow(overrides: Partial<DbClaimRow> = {}): DbClaimRow {
     },
     sourceUrl: 'https://publisher.test/accessibility/game',
     capturedAt: new Date('2026-06-01T00:00:00.000Z'),
+    contentHash: null,
+    archiveUrl: null,
     verifiedBy: null,
     verifiedAt: null,
     ...overrides,
@@ -86,6 +88,8 @@ function barrierRow(overrides: Partial<DbBarrierRow> = {}): DbBarrierRow {
     workaroundRecipeId: null,
     sourceUrl: 'https://reviewer.test/game/barriers',
     capturedAt: new Date('2026-06-15T00:00:00.000Z'),
+    contentHash: null,
+    archiveUrl: null,
     ...overrides,
   };
 }
@@ -237,6 +241,51 @@ describe('mapEntry', () => {
         SLUGS,
       ),
     ).toThrow(ExportIntegrityError);
+  });
+
+  it('carries the content hash and archive url into the corpus', () => {
+    // Without these the published claim points at an address that may 404, and
+    // nobody can check what it said when it was read.
+    const entry = mapEntry(
+      entryRow({
+        claims: [
+          claimRow({
+            contentHash: 'a'.repeat(64),
+            archiveUrl: 'https://web.archive.org/web/20260601000000/https://publisher.test/x',
+          }),
+        ],
+        barriers: [barrierRow({ contentHash: 'b'.repeat(64), archiveUrl: 'https://web.archive.org/web/20260615000000/https://reviewer.test/y' })],
+      }),
+      SLUGS,
+    );
+
+    expect(entry.claims[0]?.contentHash).toBe('a'.repeat(64));
+    expect(entry.claims[0]?.archiveUrl).toContain('web.archive.org');
+    expect(entry.barriers[0]?.contentHash).toBe('b'.repeat(64));
+    expect(entry.barriers[0]?.archiveUrl).toContain('web.archive.org');
+  });
+
+  it('surfaces the archive url as evidence the UI can link to', () => {
+    const entry = mapEntry(
+      entryRow({
+        claims: [
+          claimRow({
+            archiveUrl: 'https://web.archive.org/web/20260601000000/https://publisher.test/x',
+            contentHash: 'c'.repeat(64),
+          }),
+        ],
+      }),
+      SLUGS,
+    );
+
+    const verdict = evaluate(
+      { id: 'p', needs: [{ taxonomyId: 'large-clear-subtitles', severity: 'BLOCKER' }] },
+      entry,
+      { now: new Date('2026-07-29T00:00:00.000Z') },
+    );
+
+    expect(verdict.reasons[0]?.evidence[0]?.archiveUrl).toContain('web.archive.org');
+    expect(verdict.reasons[0]?.evidence[0]?.contentHash).toBe('c'.repeat(64));
   });
 
   it('omits optional fields rather than emitting nulls', () => {

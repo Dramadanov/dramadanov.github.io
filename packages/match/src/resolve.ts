@@ -29,6 +29,8 @@ function toEvidence(claim: FeatureClaim): Evidence {
     claimState: claim.state,
   };
   if (claim.note !== undefined) evidence.note = claim.note;
+  if (claim.archiveUrl !== undefined) evidence.archiveUrl = claim.archiveUrl;
+  if (claim.contentHash !== undefined) evidence.contentHash = claim.contentHash;
   return evidence;
 }
 

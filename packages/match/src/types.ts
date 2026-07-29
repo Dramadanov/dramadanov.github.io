@@ -54,6 +54,10 @@ export interface FeatureClaim {
   source: SourceRef;
   sourceUrl: string;
   capturedAt: string;
+  /** sha256 of exactly what was read, so the claim survives the page changing. */
+  contentHash?: string;
+  /** Immutable copy of the source, for when the original rots. */
+  archiveUrl?: string;
   verifiedBy?: string;
   verifiedAt?: string;
 }
@@ -86,6 +90,8 @@ export interface Barrier {
   /** A barrier is a claim about a game, so it carries provenance like any other. */
   sourceUrl: string;
   capturedAt: string;
+  contentHash?: string;
+  archiveUrl?: string;
 }
 
 export interface RecipeStep {
@@ -161,6 +167,9 @@ export interface Evidence {
   trustTier: number;
   sourceUrl: string;
   capturedAt: string;
+  /** Lets the UI offer an archived copy when the original has rotted. */
+  archiveUrl?: string;
+  contentHash?: string;
   claimState: ClaimState;
   note?: string;
 }

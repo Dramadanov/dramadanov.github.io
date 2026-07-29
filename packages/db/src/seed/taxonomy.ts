@@ -14,15 +14,15 @@ import {
   fetchTagPage,
   type FetchedTag,
 } from './taxonomy-source.js';
+import type { CapturedSource } from './capture.js';
 import { requireProvenance } from './guard.js';
 
 async function collectTags(): Promise<FetchedTag[]> {
   const tags: FetchedTag[] = [];
 
   for (const source of AGI_TAG_SOURCES) {
-    const html = await fetchTagPage(source.url);
-    const parsed = parseTags(html, source.url);
-    tags.push(...parsed);
+    const captured = await fetchTagPage(source.url);
+    tags.push(...parseTags(captured));
   }
 
   return tags;
@@ -35,12 +35,13 @@ async function collectTags(): Promise<FetchedTag[]> {
  * the page open. Guessing at selectors here would produce rows that look sourced
  * but are not, which is worse than having none.
  */
-function parseTags(html: string, sourceUrl: string): FetchedTag[] {
-  void html;
+function parseTags(captured: CapturedSource): FetchedTag[] {
   throw new Error(
-    `No parser implemented for ${sourceUrl}. ` +
+    `No parser implemented for ${captured.sourceUrl}. ` +
       `Fetch the page, inspect its markup, and implement parseTags against what ` +
-      `is actually there. Do not populate this from memory.`,
+      `is actually there. Do not populate this from memory. ` +
+      `Every tag it returns must carry contentHash "${captured.contentHash}" and ` +
+      `capturedAt "${captured.capturedAt.toISOString()}".`,
   );
 }
 

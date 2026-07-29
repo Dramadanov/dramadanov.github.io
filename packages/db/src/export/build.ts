@@ -57,30 +57,40 @@ export async function buildCorpus(
 
   const taxonomySlugById = new Map(taxonomyRows.map((t) => [t.id, t.slug]));
 
-  const taxonomy: ExportedTaxonomyTag[] = taxonomyRows.map((t) => ({
-    slug: t.slug,
-    label: t.label,
-    description: t.description,
-    category: t.category,
-    source: t.source,
-    sourceUrl: t.sourceUrl,
-    capturedAt: t.capturedAt.toISOString(),
-  }));
+  const taxonomy: ExportedTaxonomyTag[] = taxonomyRows.map((t) => {
+    const tag: ExportedTaxonomyTag = {
+      slug: t.slug,
+      label: t.label,
+      description: t.description,
+      category: t.category,
+      source: t.source,
+      sourceUrl: t.sourceUrl,
+      capturedAt: t.capturedAt.toISOString(),
+    };
+    if (t.archiveUrl !== null) tag.archiveUrl = t.archiveUrl;
+    if (t.contentHash !== null) tag.contentHash = t.contentHash;
+    return tag;
+  });
 
   const barrierRows = await prisma.barrierTaxonomy.findMany({
     orderBy: { slug: 'asc' },
     include: { impacts: { include: { taxonomy: true } } },
   });
 
-  const barrierTaxonomy: ExportedBarrierTag[] = barrierRows.map((b) => ({
-    slug: b.slug,
-    label: b.label,
-    description: b.description,
-    category: b.category,
-    impactsTaxonomySlugs: b.impacts.map((i) => i.taxonomy.slug).sort(),
-    sourceUrl: b.sourceUrl,
-    capturedAt: b.capturedAt.toISOString(),
-  }));
+  const barrierTaxonomy: ExportedBarrierTag[] = barrierRows.map((b) => {
+    const tag: ExportedBarrierTag = {
+      slug: b.slug,
+      label: b.label,
+      description: b.description,
+      category: b.category,
+      impactsTaxonomySlugs: b.impacts.map((i) => i.taxonomy.slug).sort(),
+      sourceUrl: b.sourceUrl,
+      capturedAt: b.capturedAt.toISOString(),
+    };
+    if (b.archiveUrl !== null) tag.archiveUrl = b.archiveUrl;
+    if (b.contentHash !== null) tag.contentHash = b.contentHash;
+    return tag;
+  });
 
   // One entry per (game, platform) pair — the unit the match engine evaluates.
   const pairs = await prisma.gamePlatform.findMany({

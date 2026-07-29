@@ -125,8 +125,13 @@ model FeatureTaxonomy {
 
   /// Where this tag definition came from. Required: tags are not authored from
   /// memory, including by Claude Code during development.
-  sourceUrl  String
-  capturedAt DateTime
+  sourceUrl   String
+  capturedAt  DateTime
+  /// Hash of exactly what was read, so a claim stays verifiable after the page
+  /// changes. Nullable only because rows captured before archiving existed.
+  contentHash String?
+  /// Immutable copy of the source, when one could be made.
+  archiveUrl  String?
 
   claims       FeatureClaim[]
   needs        ProfileNeed[]
@@ -145,10 +150,15 @@ model FeatureClaim {
   state ClaimState
   note  String?
 
-  sourceId   String
+  sourceId    String
   /// Non-null by design: no source, no claim.
-  sourceUrl  String
-  capturedAt DateTime
+  sourceUrl   String
+  capturedAt  DateTime
+  /// Hash of exactly what was read, so a claim stays verifiable after the page
+  /// changes. Nullable only because rows captured before archiving existed.
+  contentHash String?
+  /// Immutable copy of the source, when one could be made.
+  archiveUrl  String?
 
   verifiedBy String?
   verifiedAt DateTime?
@@ -197,8 +207,13 @@ model BarrierTaxonomy {
   category    TaxonomyCategory
 
   /// Same provenance rule as every other vocabulary row.
-  sourceUrl  String
-  capturedAt DateTime
+  sourceUrl   String
+  capturedAt  DateTime
+  /// Hash of exactly what was read, so a claim stays verifiable after the page
+  /// changes. Nullable only because rows captured before archiving existed.
+  contentHash String?
+  /// Immutable copy of the source, when one could be made.
+  archiveUrl  String?
 
   impacts  BarrierImpact[]
   barriers Barrier[]
@@ -236,6 +251,11 @@ model Barrier {
   /// A barrier is a claim about a game, so it carries provenance like any other.
   sourceUrl          String
   capturedAt         DateTime
+  /// Hash of exactly what was read, so a claim stays verifiable after the page
+  /// changes. Nullable only because rows captured before archiving existed.
+  contentHash        String?
+  /// Immutable copy of the source, when one could be made.
+  archiveUrl         String?
 
   game            Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
   platform        Platform        @relation(fields: [platformId], references: [id], onDelete: Cascade)
