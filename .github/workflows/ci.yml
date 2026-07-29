@@ -43,6 +43,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # generated/ is gitignored, so the client must be built before anything
+      # that imports it can typecheck.
+      - name: Generate Prisma client
+        run: pnpm --filter @access-profile/db exec prisma generate
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -74,6 +79,11 @@ jobs:
             --to-schema-datamodel prisma/schema.prisma \
             --shadow-database-url "postgresql://postgres:postgres@localhost:5432/shadow?schema=public" \
             --exit-code
+
+      # The corpus export is the only bridge from Postgres to the public site.
+      # If it cannot run, the site cannot be built.
+      - name: Corpus export runs
+        run: pnpm --filter @access-profile/db export:corpus "$RUNNER_TEMP/corpus"
 
   purity:
     name: match engine stays pure

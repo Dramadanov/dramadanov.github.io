@@ -45,6 +45,33 @@ To finish it: run the seed from a machine with network access, inspect the real
 markup of both source pages, and implement `parseTags` in
 `packages/db/src/seed/taxonomy-source.ts` against what is actually there.
 
+### Barriers have their own vocabulary, deliberately
+`Barrier` does not point at `FeatureTaxonomy`. Feature tags describe what a game
+*has*; a barrier is what a game *does to you*. There is no AGI feature tag for
+"unskippable QTE requiring 8 inputs per second", and inventing `no-unskippable-qte`
+to make one fit would bend the feature vocabulary around a modelling mistake.
+
+So: `BarrierTaxonomy` names barriers, and `BarrierImpact` maps each barrier type
+to the needs it obstructs — many-to-many, because one QTE can block one-handed
+play and low-dexterity play at once. In the match engine a barrier carries
+`impactsTaxonomyIds` and gates every need it names.
+
+### The chunk format is the contract, and it is keyed by slug
+`ExportedEntry extends GameWithClaims`, so what the exporter publishes is exactly
+what `evaluate()` consumes — the compiler enforces it and there is no adapter to
+drift.
+
+Everything in a chunk is keyed by **slug, never database id**. A profile lives in
+localStorage and in the fragment of a share link, potentially for years. If it
+referenced cuids, rebuilding the database would silently invalidate every profile
+and every share link in existence.
+
+Two export rules exist for safety, both tested:
+- Unpublished recipes never ship.
+- A barrier's `workaroundRecipeId` is dropped when it points at a recipe that is
+  not published — otherwise the engine would treat a HARD barrier as neutralised
+  by a recipe no player can read.
+
 ### Provenance is enforced in code, not by convention
 `packages/db/src/seed/guard.ts` rejects any row without a real https source URL
 and a parseable capture date, and rejects placeholder hosts like `example.com`.

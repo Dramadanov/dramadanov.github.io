@@ -18,7 +18,8 @@ device.
 | Phase | State |
 |---|---|
 | 0 — Spine | Schema + migrations done. Taxonomy seed **blocked**, see [docs/BLOCKED.md](docs/BLOCKED.md) |
-| 1 — Match engine | Done. 48 tests, 100% branch coverage |
+| 1 — Match engine | Done. 50 tests, 100% branch coverage |
+| — Corpus export | Done, ahead of Phase 2 so curation targets a settled format |
 | 2 — Curated corpus | Not started |
 | 3 — Profile builder | Not started |
 | 4 — Results | Not started |
@@ -29,10 +30,24 @@ device.
 
 ```
 packages/match   pure match engine — no imports, no I/O, runs client-side
-packages/db      Prisma schema, migrations, provenance-guarded seeds
+packages/db      Prisma schema, migrations, provenance-guarded seeds,
+                 and the static corpus exporter
 docs/            architecture notes and known blockers
 index.html       the existing GitHub Pages site, untouched
 ```
+
+## How the read side works
+
+Postgres is authoring only and never on the request path. `export:corpus` builds
+versioned JSON chunks plus a manifest with integrity hashes; the browser
+downloads those once and runs the match engine locally. No per-query server
+cost, no user database, no breach surface, and the site keeps working with the
+database down.
+
+The exporter emits `ExportedEntry`, which `extends GameWithClaims` — the exact
+type `evaluate()` consumes — so the published format cannot drift from what the
+engine reads. Chunks are keyed by slug rather than database id, because profiles
+live in share-link fragments and must survive a database rebuild.
 
 ## Getting started
 

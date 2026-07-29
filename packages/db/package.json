@@ -11,7 +11,8 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed:sources": "tsx src/seed/sources.ts",
-    "seed:taxonomy": "tsx src/seed/taxonomy.ts"
+    "seed:taxonomy": "tsx src/seed/taxonomy.ts",
+    "export:corpus": "tsx src/export/build.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
@@ -21,6 +22,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3"
+    "@prisma/client": "6.19.3",
+    "@access-profile/match": "workspace:*"
   }
 }
