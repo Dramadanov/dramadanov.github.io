@@ -31,7 +31,7 @@ describe('recipe staleness', () => {
 
     expect(verdict.outcome).toBe('PLAYABLE_WITH_CONFIG');
     expect(verdict.warnings).toHaveLength(1);
-    expect(verdict.warnings[0]?.kind).toBe('STALE');
+    expect(verdict.warnings[0]?.kind).toBe('STALE_RECIPE');
     // First-party evidence would otherwise be HIGH.
     expect(verdict.confidence).toBe('LOW');
   });

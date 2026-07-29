@@ -9,7 +9,7 @@ import type {
   ProfileNeed,
   Reason,
   ReasonStatus,
-  RecipeWarning,
+  VerdictWarning,
   SettingsRecipe,
   TaxonomyId,
   Verdict,
@@ -18,7 +18,22 @@ import type {
 /** Plan §2.5: a recipe goes stale 180 days after it was verified. */
 export const DEFAULT_STALE_AFTER_DAYS = 180;
 
+/**
+ * Claims decay more slowly than recipes. A recipe's menu paths move with every
+ * patch; a game that shipped captions usually still has them. But "usually" is
+ * not "verifiably", and a first-party test from four years ago should not be
+ * presented with the same confidence as one from last month.
+ */
+export const DEFAULT_CLAIM_MEDIUM_AFTER_DAYS = 365;
+export const DEFAULT_CLAIM_LOW_AFTER_DAYS = 730;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+function ageInDays(capturedAt: string, now: Date): number | undefined {
+  const captured = Date.parse(capturedAt);
+  if (Number.isNaN(captured)) return undefined;
+  return Math.floor((now.getTime() - captured) / DAY_MS);
+}
 
 interface NeedAnalysis {
   need: ProfileNeed;
@@ -142,6 +157,10 @@ export function evaluate(
 ): Verdict {
   const now = options.now ?? new Date();
   const staleAfterDays = options.staleAfterDays ?? DEFAULT_STALE_AFTER_DAYS;
+  const claimMediumAfterDays =
+    options.claimMediumAfterDays ?? DEFAULT_CLAIM_MEDIUM_AFTER_DAYS;
+  const claimLowAfterDays =
+    options.claimLowAfterDays ?? DEFAULT_CLAIM_LOW_AFTER_DAYS;
 
   const analyses = profile.needs.map((need) => analyseNeed(need, game));
 
@@ -195,24 +214,39 @@ export function evaluate(
     }
   }
 
-  const warnings: RecipeWarning[] = [];
+  const warnings: VerdictWarning[] = [];
   const staleRecipeIds = new Set<string>();
   for (const recipe of attachedRecipes) {
     if (!isStale(recipe, now, staleAfterDays)) continue;
     staleRecipeIds.add(recipe.id);
     warnings.push({
+      kind: 'STALE_RECIPE',
       recipeId: recipe.id,
-      kind: 'STALE',
       detail: `Recipe "${recipe.title}" was verified against ${recipe.gameVersion} on ${recipe.verifiedAt} and is past the ${staleAfterDays}-day freshness window. Menu paths may have moved.`,
     });
   }
 
+  // Warn about ageing evidence wherever it exists; confidence is only capped
+  // below where that evidence actually drove the outcome.
+  for (const analysis of analyses) {
+    const { decidedAt } = analysis.resolved;
+    if (decidedAt === undefined) continue;
+    const age = ageInDays(decidedAt, now);
+    if (age === undefined || age < claimMediumAfterDays) continue;
+    warnings.push({
+      kind: 'AGEING_CLAIM',
+      taxonomyId: analysis.need.taxonomyId,
+      capturedAt: decidedAt,
+      ageDays: age,
+      detail: `The strongest evidence for "${analysis.need.taxonomyId}" was captured ${age} days ago. The game may have changed since.`,
+    });
+  }
+
   // ---- Confidence ---------------------------------------------------------
-  const confidence = deriveConfidence(
-    outcome,
-    decisive,
-    staleRecipeIds,
-  );
+  const confidence = deriveConfidence(outcome, decisive, staleRecipeIds, now, {
+    mediumAfterDays: claimMediumAfterDays,
+    lowAfterDays: claimLowAfterDays,
+  });
 
   // ---- Reasons: one per need, always ------------------------------------
   const reasons: Reason[] = analyses.map((a) => {
@@ -248,6 +282,8 @@ function deriveConfidence(
   outcome: Verdict['outcome'],
   decisive: readonly NeedAnalysis[],
   staleRecipeIds: ReadonlySet<string>,
+  now: Date,
+  claimAge: { mediumAfterDays: number; lowAfterDays: number },
 ): Confidence {
   // We know nothing by definition — never dress that up.
   if (outcome === 'UNVERIFIED') return 'LOW';
@@ -257,12 +293,18 @@ function deriveConfidence(
   for (const analysis of decisive) {
     // Barrier-driven decisions carry a sourceUrl but no trust tier in the data
     // model, so they contribute the middle of the road rather than nothing.
-    const perNeed: Confidence =
+    let perNeed: Confidence =
       analysis.resolved.tier > 0
         ? confidenceFromTier(analysis.resolved.tier)
         : analysis.status === 'BLOCKED_BY_BARRIER'
           ? 'MEDIUM'
           : 'LOW';
+
+    // Who looked is only half of it; when they looked is the other half.
+    perNeed = weakestConfidence(
+      perNeed,
+      confidenceFromClaimAge(analysis.resolved.decidedAt, now, claimAge),
+    );
 
     confidence =
       confidence === undefined ? perNeed : weakestConfidence(confidence, perNeed);
@@ -279,4 +321,22 @@ function deriveConfidence(
   if (leansOnStaleRecipe) confidence = weakestConfidence(confidence, 'LOW');
 
   return confidence;
+}
+
+/**
+ * The ceiling that a claim's age puts on confidence. Undated or unparseable
+ * evidence is treated as old rather than fresh — under-promising is the safe
+ * failure everywhere in this engine.
+ */
+function confidenceFromClaimAge(
+  decidedAt: string | undefined,
+  now: Date,
+  { mediumAfterDays, lowAfterDays }: { mediumAfterDays: number; lowAfterDays: number },
+): Confidence {
+  if (decidedAt === undefined) return 'HIGH'; // no claim drove this; nothing to age
+  const age = ageInDays(decidedAt, now);
+  if (age === undefined) return 'LOW';
+  if (age >= lowAfterDays) return 'LOW';
+  if (age >= mediumAfterDays) return 'MEDIUM';
+  return 'HIGH';
 }

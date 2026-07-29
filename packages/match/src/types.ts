@@ -194,11 +194,23 @@ export interface Reason {
   };
 }
 
-export interface RecipeWarning {
-  recipeId: string;
-  kind: 'STALE';
-  detail: string;
-}
+/**
+ * Things a reader should know that do not change the outcome.
+ *
+ * Recipes and claims both decay, but at different rates and for different
+ * reasons: a recipe's menu paths move with every patch, whereas a game that
+ * shipped captions generally keeps them. So claims are given a longer rope than
+ * recipes rather than the same one.
+ */
+export type VerdictWarning =
+  | { kind: 'STALE_RECIPE'; recipeId: string; detail: string }
+  | {
+      kind: 'AGEING_CLAIM';
+      taxonomyId: TaxonomyId;
+      capturedAt: string;
+      ageDays: number;
+      detail: string;
+    };
 
 export interface Verdict {
   outcome: Outcome;
@@ -208,7 +220,7 @@ export interface Verdict {
   recipes: SettingsRecipe[];
   /** Needs with no data at all. */
   gaps: TaxonomyId[];
-  warnings: RecipeWarning[];
+  warnings: VerdictWarning[];
 }
 
 export interface EvaluateOptions {
@@ -219,4 +231,8 @@ export interface EvaluateOptions {
   now?: Date;
   /** Recipes go stale after this many days. Plan §2.5. */
   staleAfterDays?: number;
+  /** A decisive claim older than this caps confidence at MEDIUM. */
+  claimMediumAfterDays?: number;
+  /** A decisive claim older than this caps confidence at LOW. */
+  claimLowAfterDays?: number;
 }
