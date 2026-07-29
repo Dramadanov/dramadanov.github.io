@@ -12,7 +12,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed:sources": "tsx src/seed/sources.ts",
     "seed:taxonomy": "tsx src/seed/taxonomy.ts",
-    "export:corpus": "tsx src/export/build.ts"
+    "export:corpus": "tsx src/export/build.ts",
+    "verify:export": "tsx src/export/verify.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

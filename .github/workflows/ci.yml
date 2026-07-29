@@ -85,6 +85,21 @@ jobs:
       - name: Corpus export runs
         run: pnpm --filter @access-profile/db export:corpus "$RUNNER_TEMP/corpus"
 
+      # The mapper is unit-tested without a database. This covers what those
+      # tests cannot: the Prisma queries, the joins, the file writing and the
+      # hashing — against a throwaway database, with a fictional fixture.
+      - name: Create export verification database
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE export_e2e;'
+        env:
+          PGPASSWORD: postgres
+
+      - name: Export path verified end to end
+        run: |
+          pnpm --filter @access-profile/db exec prisma migrate deploy
+          pnpm --filter @access-profile/db verify:export
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/export_e2e?schema=public
+
   purity:
     name: match engine stays pure
     runs-on: ubuntu-latest

@@ -77,6 +77,22 @@ Two export rules exist for safety, both tested:
 and a parseable capture date, and rejects placeholder hosts like `example.com`.
 Route every write of claim-shaped data through it.
 
+Capture, don't just cite: `capture.ts` fetches a source, hashes exactly what it
+read, and pushes a copy to the Wayback Machine. `contentHash` and `archiveUrl`
+ride along to the exported corpus, so a claim stays checkable after its source
+404s or quietly changes. Archiving is free while ingesting and impossible
+retroactively — do it at write time or not at all.
+
+### Confidence is trust × recency
+Trust tier answers who looked, `capturedAt` answers when. A decisive claim past
+a year caps confidence at MEDIUM, past two years at LOW — a longer rope than the
+180-day recipe window, because menu paths move every patch while a game that
+shipped captions usually still has them.
+
+Age is a ceiling, never a boost: a same-day community report is still LOW.
+Warnings are emitted wherever evidence is ageing; confidence is only capped
+where that evidence actually drove the outcome.
+
 ### Test fixtures use example.invalid on purpose
 Fixtures in `packages/match/test` invent games, tags and URLs. They exercise the
 rule set; they are not claims about real games. The provenance guard rejects that

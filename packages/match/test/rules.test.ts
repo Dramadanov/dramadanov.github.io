@@ -368,6 +368,38 @@ describe('reasons and gaps', () => {
     expect(evidence[0]?.capturedAt).toBeTruthy();
   });
 
+  it('surfaces the archived copy and content hash as evidence', () => {
+    // So the UI can still show what a source said after the page has changed.
+    const verdict = evaluate(
+      profile([['captions', 'BLOCKER']]),
+      game({
+        claims: [
+          claim('captions', 'PRESENT', 'PUBLISHER', {
+            archiveUrl: 'https://web.archive.org/web/20260601000000/https://p.test/a',
+            contentHash: 'f'.repeat(64),
+          }),
+        ],
+      }),
+      opts,
+    );
+
+    const evidence = verdict.reasons[0]?.evidence[0];
+    expect(evidence?.archiveUrl).toContain('web.archive.org');
+    expect(evidence?.contentHash).toBe('f'.repeat(64));
+  });
+
+  it('omits archive fields when the source was never captured', () => {
+    const verdict = evaluate(
+      profile([['captions', 'BLOCKER']]),
+      game({ claims: [claim('captions', 'PRESENT')] }),
+      opts,
+    );
+
+    const evidence = verdict.reasons[0]?.evidence[0];
+    expect(evidence?.archiveUrl).toBeUndefined();
+    expect(evidence?.contentHash).toBeUndefined();
+  });
+
   it('surfaces claim notes as evidence notes', () => {
     const verdict = evaluate(
       profile([['captions', 'BLOCKER']]),

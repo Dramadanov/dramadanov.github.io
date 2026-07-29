@@ -72,8 +72,13 @@ Under-promising is always the safe failure. Concretely:
 
 - No accessibility claim is written without a fetched source URL and a capture
   date. Enforced in code by `packages/db/src/seed/guard.ts`, not by convention.
+- Sources are archived, not just cited — every claim carries a hash of what was
+  read and a link to an immutable copy, so it stays checkable after the page
+  changes or disappears.
 - Absence of data is `UNVERIFIED`, never `false`.
 - Blocker needs are hard gates — no weighting, no probabilistic softening.
+- Confidence combines who looked with how long ago; old evidence cannot be
+  presented as certain.
 - Every verdict returns the reasoning and sources that produced it.
 
 The property test in `packages/match/test/properties.test.ts` enumerates every
