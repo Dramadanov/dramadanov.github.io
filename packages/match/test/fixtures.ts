@@ -52,17 +52,24 @@ export function claim(
   };
 }
 
+/**
+ * `impacts` is the list of needs this barrier obstructs. Passing a single string
+ * is shorthand for a barrier that obstructs exactly one need.
+ */
 export function barrier(
-  taxonomyId: string,
+  impacts: string | string[],
   severity: BarrierSeverity,
   overrides: Partial<Barrier> = {},
 ): Barrier {
+  const impactsTaxonomyIds = typeof impacts === 'string' ? [impacts] : impacts;
   return {
     id: nextId('barrier'),
-    taxonomyId,
+    barrierSlug: `synthetic-${severity.toLowerCase()}-barrier`,
+    impactsTaxonomyIds,
     severity,
-    description: `${severity} barrier on ${taxonomyId}`,
-    sourceUrl: `https://example.invalid/barrier/${taxonomyId}`,
+    description: `${severity} barrier on ${impactsTaxonomyIds.join(', ')}`,
+    sourceUrl: `https://example.invalid/barrier/${impactsTaxonomyIds[0] ?? 'x'}`,
+    capturedAt: '2026-06-01T00:00:00.000Z',
     ...overrides,
   };
 }

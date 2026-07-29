@@ -58,14 +58,34 @@ export interface FeatureClaim {
   verifiedAt?: string;
 }
 
+/**
+ * A barrier is something the game does to the player, not a feature it lacks.
+ * "Has a colourblind mode" and "has an unskippable QTE requiring 8 inputs per
+ * second" are not opposites, and only the second decides whether someone can
+ * finish the game.
+ *
+ * Barriers therefore have their own vocabulary. Feature tags describe what a
+ * game HAS; there is no feature tag for the QTE, and inventing one
+ * (`no-unskippable-qte`) would corrupt the feature taxonomy to work around a
+ * modelling mistake. Instead a barrier names itself from the barrier vocabulary
+ * and declares which access needs it obstructs.
+ */
 export interface Barrier {
   id: string;
-  taxonomyId: TaxonomyId;
+  /** Slug from the barrier vocabulary, e.g. "unskippable-high-apm-qte". */
+  barrierSlug: string;
+  /**
+   * Feature-taxonomy ids this barrier obstructs — the needs a player might have
+   * marked. Denormalised so the static chunk carries it without a join.
+   */
+  impactsTaxonomyIds: TaxonomyId[];
   severity: BarrierSeverity;
   description: string;
   /** A recipe that neutralises this barrier. Without one, a HARD barrier gates. */
   workaroundRecipeId?: string;
+  /** A barrier is a claim about a game, so it carries provenance like any other. */
   sourceUrl: string;
+  capturedAt: string;
 }
 
 export interface RecipeStep {
@@ -147,9 +167,11 @@ export interface Evidence {
 
 export interface BarrierRef {
   id: string;
+  barrierSlug: string;
   severity: BarrierSeverity;
   description: string;
   sourceUrl: string;
+  capturedAt: string;
   hasWorkaround: boolean;
 }
 

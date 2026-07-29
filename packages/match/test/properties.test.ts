@@ -108,10 +108,12 @@ function buildCase(
   if (combo.barrierShape !== 'NONE') {
     const base: Barrier = {
       id: `barrier-${taxonomyId}`,
-      taxonomyId,
+      barrierSlug: `synthetic-barrier-${taxonomyId}`,
+      impactsTaxonomyIds: [taxonomyId],
       severity: combo.barrierShape === 'SITUATIONAL' ? 'SITUATIONAL' : 'HARD',
       description: 'synthetic barrier',
       sourceUrl: `https://example.invalid/barrier/${taxonomyId}`,
+      capturedAt: '2026-06-01T00:00:00.000Z',
     };
     barriers.push(
       combo.barrierShape === 'HARD_WITH_WORKAROUND'

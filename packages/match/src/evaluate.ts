@@ -70,15 +70,19 @@ function analyseNeed(need: ProfileNeed, game: GameWithClaims): NeedAnalysis {
   );
   const recipeIds = new Set(recipes.map((r) => r.id));
 
-  const rawBarriers = game.barriers.filter(
-    (b) => b.taxonomyId === need.taxonomyId,
+  // A barrier obstructs a need when its own vocabulary entry declares that need
+  // among the ones it impacts — barriers are not keyed by feature tag.
+  const rawBarriers = game.barriers.filter((b) =>
+    b.impactsTaxonomyIds.includes(need.taxonomyId),
   );
 
   const barriers: BarrierRef[] = rawBarriers.map((b) => ({
     id: b.id,
+    barrierSlug: b.barrierSlug,
     severity: b.severity,
     description: b.description,
     sourceUrl: b.sourceUrl,
+    capturedAt: b.capturedAt,
     // A workaround only counts if the recipe it names actually exists on this game.
     hasWorkaround:
       b.workaroundRecipeId !== undefined && recipeIds.has(b.workaroundRecipeId),

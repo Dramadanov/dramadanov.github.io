@@ -83,6 +83,53 @@ describe('rule 1 — HARD barrier on a blocker need with no workaround', () => {
     expect(verdict.reasons[0]?.barriers[0]?.severity).toBe('SITUATIONAL');
   });
 
+  it('gates every need a single barrier obstructs', () => {
+    // One QTE blocks one-handed play and low-dexterity play at once. Under the
+    // old feature-keyed model this needed two invented tags.
+    const qte = barrier(['one-handed', 'low-dexterity'], 'HARD', {
+      barrierSlug: 'unskippable-high-apm-qte',
+      description: 'Unskippable QTE requiring 8 inputs per second.',
+    });
+
+    const verdict = evaluate(
+      profile([
+        ['one-handed', 'BLOCKER'],
+        ['low-dexterity', 'FRICTION'],
+        ['captions', 'BLOCKER'],
+      ]),
+      game({ claims: [claim('captions', 'PRESENT')], barriers: [qte] }),
+      opts,
+    );
+
+    expect(verdict.outcome).toBe('NOT_PLAYABLE');
+    const blocked = verdict.reasons.filter(
+      (r) => r.status === 'BLOCKED_BY_BARRIER',
+    );
+    expect(blocked.map((r) => r.taxonomyId)).toEqual([
+      'one-handed',
+      'low-dexterity',
+    ]);
+    // The barrier names itself from the barrier vocabulary, not the feature one.
+    expect(blocked[0]?.barriers[0]?.barrierSlug).toBe('unskippable-high-apm-qte');
+    // Only the blocker drove the verdict; the friction need is reported, not decisive.
+    expect(blocked[0]?.decisive).toBe(true);
+    expect(blocked[1]?.decisive).toBe(false);
+  });
+
+  it('does not gate a need the barrier does not name', () => {
+    const verdict = evaluate(
+      profile([['captions', 'BLOCKER']]),
+      game({
+        claims: [claim('captions', 'PRESENT')],
+        barriers: [barrier(['one-handed'], 'HARD')],
+      }),
+      opts,
+    );
+
+    expect(verdict.outcome).toBe('PLAYABLE');
+    expect(verdict.reasons[0]?.barriers).toEqual([]);
+  });
+
   it('ignores a HARD barrier that is not on a blocker need', () => {
     const verdict = evaluate(
       profile([['captions', 'FRICTION']]),

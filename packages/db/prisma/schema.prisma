@@ -128,9 +128,9 @@ model FeatureTaxonomy {
   sourceUrl  String
   capturedAt DateTime
 
-  claims   FeatureClaim[]
-  barriers Barrier[]
-  needs    ProfileNeed[]
+  claims       FeatureClaim[]
+  needs        ProfileNeed[]
+  obstructedBy BarrierImpact[]
 
   @@index([category])
 }
@@ -145,7 +145,7 @@ model FeatureClaim {
   state ClaimState
   note  String?
 
-  sourceId String
+  sourceId   String
   /// Non-null by design: no source, no claim.
   sourceUrl  String
   capturedAt DateTime
@@ -169,9 +169,9 @@ model FeatureClaim {
 }
 
 model Source {
-  id   String     @id @default(cuid())
-  name String     @unique
-  kind SourceKind
+  id        String     @id @default(cuid())
+  name      String     @unique
+  kind      SourceKind
   /// 1..4, higher is more trusted. Drives conflict resolution (plan §5):
   /// first-party testing > publisher/storefront > established reviewer > community.
   trustTier Int
@@ -181,31 +181,72 @@ model Source {
   createdAt DateTime @default(now())
 }
 
+/// The vocabulary of barriers — things a game DOES to a player, as opposed to
+/// features it has.
+///
+/// This is deliberately a separate table from FeatureTaxonomy. Feature tags
+/// describe what a game has; there is no feature tag for "unskippable QTE
+/// requiring 8 inputs per second", and inventing one (`no-unskippable-qte`)
+/// would bend the feature vocabulary around a modelling mistake. Barriers name
+/// themselves, and declare separately which needs they obstruct.
+model BarrierTaxonomy {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  label       String
+  description String
+  category    TaxonomyCategory
+
+  /// Same provenance rule as every other vocabulary row.
+  sourceUrl  String
+  capturedAt DateTime
+
+  impacts  BarrierImpact[]
+  barriers Barrier[]
+
+  @@index([category])
+}
+
+/// Which access needs a barrier type obstructs. Many-to-many: one barrier can
+/// block several needs at once, which is the case the old feature-keyed model
+/// could not express without duplicating the barrier.
+model BarrierImpact {
+  barrierTaxonomyId String
+  taxonomyId        String
+
+  barrierTaxonomy BarrierTaxonomy @relation(fields: [barrierTaxonomyId], references: [id], onDelete: Cascade)
+  taxonomy        FeatureTaxonomy @relation(fields: [taxonomyId], references: [id], onDelete: Cascade)
+
+  @@id([barrierTaxonomyId, taxonomyId])
+  @@index([taxonomyId])
+}
+
 /// The inverse of a feature, and more decisive. "Has a colourblind mode" and
 /// "has an unskippable QTE requiring 8 inputs per second" are not opposites,
 /// and only the second decides whether someone can finish the game.
 model Barrier {
-  id         String @id @default(cuid())
-  gameId     String
-  platformId String
-  taxonomyId String
+  id                String @id @default(cuid())
+  gameId            String
+  platformId        String
+  barrierTaxonomyId String
 
   severity    BarrierSeverity
   description String
 
   workaroundRecipeId String?
+  /// A barrier is a claim about a game, so it carries provenance like any other.
   sourceUrl          String
+  capturedAt         DateTime
 
-  game      Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  platform  Platform        @relation(fields: [platformId], references: [id], onDelete: Cascade)
-  taxonomy  FeatureTaxonomy @relation(fields: [taxonomyId], references: [id])
-  workaround SettingsRecipe? @relation(fields: [workaroundRecipeId], references: [id], onDelete: SetNull)
+  game            Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  platform        Platform        @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  barrierTaxonomy BarrierTaxonomy @relation(fields: [barrierTaxonomyId], references: [id])
+  workaround      SettingsRecipe? @relation(fields: [workaroundRecipeId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([gameId, platformId])
-  @@index([taxonomyId])
+  @@index([barrierTaxonomyId])
 }
 
 /// Versioned against a game build: menus move between patches (plan §2.5).
@@ -249,7 +290,7 @@ model RecipeStep {
   order    Int
 
   /// "Options > Accessibility > Visual"
-  menuPath String
+  menuPath      String
   /// "Set Subtitle Size to Large"
   action        String
   note          String?

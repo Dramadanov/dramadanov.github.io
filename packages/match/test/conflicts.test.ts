@@ -154,10 +154,12 @@ describe('confidence', () => {
         barriers: [
           {
             id: 'b1',
-            taxonomyId: 'a',
+            barrierSlug: 'unskippable-high-apm-qte',
+            impactsTaxonomyIds: ['a'],
             severity: 'HARD',
             description: 'Unskippable timed sequence.',
             sourceUrl: 'https://example.invalid/b1',
+            capturedAt: '2026-06-01T00:00:00.000Z',
           },
         ],
       }),
